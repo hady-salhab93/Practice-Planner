@@ -1,0 +1,28 @@
+{
+  "name": "practice-planner",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.12.3",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --filter=@practice-planner/local",
+    "start": "pnpm --filter @practice-planner/local start",
+    "test": "turbo run test --concurrency=1",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:static": "pnpm run typecheck && pnpm run lint",
+    "check": "pnpm run check:static && pnpm run test"
+  },
+  "devDependencies": {
+    "oxlint": "^1.85.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "prettier": "^3.4.2",
+    "turbo": "^2.5.6",
+    "typescript": "7.0.2"
+  }
+}
