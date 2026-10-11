@@ -10,6 +10,8 @@
     "build": "turbo run build",
     "dev": "turbo run dev --filter=@practice-planner/local",
     "start": "pnpm --filter @practice-planner/local start",
+    "db:up": "docker compose up -d --wait db",
+    "db:migrate": "pnpm --filter @practice-planner/core db:migrate",
     "test": "turbo run test --concurrency=1",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",

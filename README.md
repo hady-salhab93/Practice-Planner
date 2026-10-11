@@ -18,7 +18,7 @@ Status: product planning has been reset for feature-by-feature discovery. The ar
 
 ## Features
 
-Features will be identified and discussed individually before their PRDs and implementation issues are written. No product features are currently approved for implementation.
+The first Material management slice is implemented: standalone Material can be added to the Library and renamed. See the [approved feature PRD](docs/features/material-management.md) and [implementation slices](docs/issues/material-management/README.md) for scope and remaining work.
 
 ## Getting Started
 
@@ -30,14 +30,17 @@ Requirements: Node.js 20.19 or later and pnpm 9.12.3.
 
 ```powershell
 pnpm install
+Copy-Item .env.example .env
+pnpm db:up
+pnpm db:migrate
 pnpm dev
 ```
 
-The local app runs at the URL printed by React Router. Copy `.env.example` to `.env` and set `DATABASE_URL` when working on database-backed features.
+The local app runs at the URL printed by React Router. PostgreSQL runs in Docker Compose, listens on localhost only, and stores data in a persistent named volume. Database backups are not configured.
 
 ## Usage
 
-Product workflows will be defined through feature interviews. The current application is a shell, not an implementation of the previous product plan.
+The Library supports adding and renaming standalone Material. Other product workflows remain future work.
 
 ## Architecture
 
@@ -53,13 +56,13 @@ The [frontend standards](docs/FRONTEND_STANDARDS.md) define the application's vi
 
 ## Configuration
 
-PostgreSQL is selected for server-side persistence, using Drizzle ORM and the `pg` driver. Database placement, installation, local access restrictions, and backup remain open. Supabase is not part of the selected architecture.
+PostgreSQL is selected for server-side persistence, using Drizzle ORM and the `pg` driver. The local database runs in Docker Compose on localhost with a persistent named volume. Backups remain deferred. Supabase is not part of the selected architecture.
 
 ## Development
 
 [Copilot guidance](.github/copilot-instructions.md) routes agents to authoritative documents and the [planning workflow](docs/agents/planning.md). Run `pnpm check` for the current static and test checks, `pnpm build` for a production build, and `pnpm format` to format files.
 
-The database server and its location have not been provisioned or selected. Database-backed workflows are not implemented yet.
+Use `pnpm db:up` to start the local database and `pnpm db:migrate` to apply schema migrations. Set `TEST_DATABASE_URL` in `.env` for PostgreSQL-backed integration tests.
 
 ## Troubleshooting
 

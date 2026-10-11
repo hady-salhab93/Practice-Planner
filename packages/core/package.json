@@ -13,11 +13,13 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "db:migrate": "drizzle-kit migrate",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "oxlint --type-aware src"
   },
   "dependencies": {
+    "dotenv": "^18.0.7",
     "drizzle-orm": "^0.44.3",
     "pg": "^8.23.0"
   },

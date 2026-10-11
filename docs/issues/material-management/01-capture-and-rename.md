@@ -1,6 +1,6 @@
 ---
 name: Capture and rename standalone Material
-status: planned
+status: complete
 blocked_by: []
 ---
 
@@ -14,17 +14,17 @@ Source: [approved PRD](../../features/material-management.md). Apply the shared 
 
 ## Dependencies
 
-Resolve the database placement/setup decisions needed to run and verify this workflow, then establish a usable PostgreSQL persistence environment. This issue includes its own minimal Material persistence and server/UI wiring; database setup is not a separate product-feature slice. Infrastructure choices still require agreement.
+Database setup is resolved for this slice: PostgreSQL runs in local Docker Compose, bound to localhost with a persistent named volume. Backup setup is deferred. This issue includes its own minimal Material persistence and server/UI wiring; database setup is not a separate product-feature slice.
 
 ## Acceptance Criteria
 
-- [ ] Create standalone Material using a required title and see it in the Library; no type, parent, or completion state is required.
-- [ ] Saved Material remains after leaving the view and reloading the application.
-- [ ] Rename Material while preserving its identity; Save persists and Cancel leaves the saved title unchanged.
-- [ ] Reject conflicting standalone titles, ignoring capitalization and surrounding spaces, and identify the conflicting Material without overwriting or automatically renaming it.
-- [ ] New standalone Material appears at the end of the Library group.
-- [ ] Warn before leaving unsaved edits; validation or save failures preserve relevant input for correction or retry.
-- [ ] Verify UI-to-persistence success and failure behavior and authoritative uniqueness enforcement, not just client-side guards.
+- [x] Create standalone Material using a required title and see it in the Library; no type, parent, or completion state is required.
+- [x] Saved Material remains after leaving the view and reloading the application.
+- [x] Rename Material while preserving its identity; Save persists and Cancel leaves the saved title unchanged.
+- [x] Reject conflicting standalone titles, ignoring capitalization and surrounding spaces, and identify the conflicting Material without overwriting or automatically renaming it.
+- [x] New standalone Material appears at the end of the Library group.
+- [x] Warn before leaving unsaved edits; validation or save failures preserve relevant input for correction or retry.
+- [x] Verify UI-to-persistence success and failure behavior and authoritative uniqueness enforcement, not just client-side guards.
 
 ## Exclusions
 

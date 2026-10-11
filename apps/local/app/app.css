@@ -3,10 +3,17 @@
 :root {
   color-scheme: light dark;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  color: oklch(0.145 0 0);
-  background: oklch(1 0 0);
+  color: var(--foreground);
+  background: var(--background);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --border: oklch(0.922 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
 }
 
 * {
@@ -17,23 +24,210 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  color: var(--foreground);
 }
 
-main {
-  width: min(100% - 2rem, 72rem);
+.library-page {
+  width: min(100% - 2rem, 56rem);
   margin-inline: auto;
-  padding-block: 2rem;
+  padding-block: 3rem 5rem;
 }
 
-h1 {
+.page-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-context {
+  margin: 0 0 0.35rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.page-header h1 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 600;
+}
+
+.material-count {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.capture-section,
+.library-section {
+  padding-block: 1.5rem;
+}
+
+.capture-section {
+  border-bottom: 1px solid var(--border);
+}
+
+.capture-section h2,
+.library-section h2 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.capture-form,
+.rename-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+label {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+input {
+  min-width: 0;
+  min-height: 2.25rem;
+  flex: 1;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  background: var(--background);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.button {
+  min-height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.button-primary {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.button-secondary {
+  color: var(--foreground);
+  border-color: var(--border);
+  background: var(--background);
+}
+
+.library-section {
+  padding-top: 1.75rem;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.material-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+
+.material-row {
+  min-height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.material-title {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.rename-form {
+  width: 100%;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 1rem 0;
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
+}
+
+.form-error {
+  margin: 0;
+  color: var(--destructive);
+  font-size: 0.875rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    color: oklch(0.85 0 0);
-    background: oklch(0.145 0 0);
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.85 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+  }
+}
+
+@media (max-width: 36rem) {
+  .library-page {
+    padding-block: 1.5rem 3rem;
+  }
+
+  .form-row {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .form-row input {
+    flex-basis: 100%;
+  }
+
+  .material-row {
+    align-items: flex-start;
+  }
+
+  .rename-button {
+    flex: 0 0 auto;
   }
 }

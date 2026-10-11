@@ -15,6 +15,7 @@ Practice Planner uses its own pnpm/Turbo workspace and local development tooling
 - The selected tooling is pnpm workspaces, Turbo, Node.js, TypeScript, React 19, React Router framework mode with its Node server adapter, Vite, Drizzle ORM, `pg`, Vitest, Oxlint, Prettier, Tailwind CSS, and Lucide. Consult this repository's package manifests and lockfile for versions.
 - Keep the React Router application in `apps/local` and domain/database ownership in `packages/core`; add other apps or packages only for an approved requirement.
 - The browser and application server run locally initially. PostgreSQL location is still open; local application use does not require a database on the same machine or imply offline operation.
+- For the first Material slice, PostgreSQL runs in Docker Compose on this machine, bound to localhost and stored in a persistent named volume. Backup setup is explicitly deferred.
 - Database placement, installation, backup, local access restrictions, and UI component primitives remain open. See [ADR 0004](adr/0004-react-router-fullstack-postgresql.md); [ADR 0003](adr/0003-local-postgresql-first.md) is superseded.
 
 ## Approved Request Flow
