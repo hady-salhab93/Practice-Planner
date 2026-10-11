@@ -239,7 +239,29 @@ button:focus-visible {
 .material-actions {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.5rem;
+}
+
+.material-order-form {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.material-actions .material-order-form .button-secondary {
+  width: 2rem;
+  min-height: 2rem;
+  padding: 0;
+}
+
+.material-actions.material-actions-error {
+  opacity: 1;
+}
+
+.material-order-error {
+  flex-basis: 100%;
+  text-align: right;
 }
 
 .material-actions .button-secondary {

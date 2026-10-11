@@ -10,6 +10,8 @@ import {
   createStandaloneMaterial,
   listLibraryMaterialTree,
   listLibraryMaterials,
+  MaterialNotFoundError,
+  reorderMaterial,
   renameMaterial,
   updateMaterialMetadata,
 } from "./material-operations.js";
@@ -132,6 +134,101 @@ describe("Material operations", () => {
     expect(savedChapter?.children.map((material) => material.id)).toContain(
       renamedExercise.id,
     );
+  });
+
+  it("reorders standalone and nested Material without changing other groups", async () => {
+    const firstRoot = await createStandaloneMaterial(
+      database,
+      `First root ${crypto.randomUUID()}`,
+    );
+    const secondRoot = await createStandaloneMaterial(
+      database,
+      `Second root ${crypto.randomUUID()}`,
+    );
+    const parent = await createStandaloneMaterial(
+      database,
+      `Parent ${crypto.randomUUID()}`,
+    );
+    const otherParent = await createStandaloneMaterial(
+      database,
+      `Other parent ${crypto.randomUUID()}`,
+    );
+    const firstChild = await createChildMaterial(
+      database,
+      parent.id,
+      `First child ${crypto.randomUUID()}`,
+    );
+    const secondChild = await createChildMaterial(
+      database,
+      parent.id,
+      `Second child ${crypto.randomUUID()}`,
+    );
+    const grandchild = await createChildMaterial(
+      database,
+      firstChild.id,
+      `Grandchild ${crypto.randomUUID()}`,
+    );
+    const otherChild = await createChildMaterial(
+      database,
+      otherParent.id,
+      `Other child ${crypto.randomUUID()}`,
+    );
+
+    await reorderMaterial(database, secondRoot.id, "up");
+    await reorderMaterial(database, secondChild.id, "up");
+
+    const reloadedRoots = await listLibraryMaterials(database);
+    const reloadedTree = await listLibraryMaterialTree(database);
+    const reloadedParent = reloadedTree.find(
+      (material) => material.id === parent.id,
+    );
+    const reloadedFirstChild = reloadedParent?.children.find(
+      (material) => material.id === firstChild.id,
+    );
+    const reloadedOtherParent = reloadedTree.find(
+      (material) => material.id === otherParent.id,
+    );
+
+    expect(
+      reloadedRoots
+        .filter((material) => [firstRoot.id, secondRoot.id].includes(material.id))
+        .map((material) => material.id),
+    ).toEqual([secondRoot.id, firstRoot.id]);
+    expect(reloadedParent?.children.map((material) => material.id)).toEqual([
+      secondChild.id,
+      firstChild.id,
+    ]);
+    expect(reloadedFirstChild?.children.map((material) => material.id)).toEqual(
+      [grandchild.id],
+    );
+    expect(reloadedOtherParent?.children.map((material) => material.id)).toEqual(
+      [otherChild.id],
+    );
+  });
+
+  it("preserves sibling order at a boundary and when the Material is missing", async () => {
+    const first = await createStandaloneMaterial(
+      database,
+      `First ${crypto.randomUUID()}`,
+    );
+    const last = await createStandaloneMaterial(
+      database,
+      `Last ${crypto.randomUUID()}`,
+    );
+    const groupIds = [first.id, last.id];
+    const before = (await listLibraryMaterials(database))
+      .filter((material) => groupIds.includes(material.id))
+      .map((material) => material.id);
+
+    await reorderMaterial(database, last.id, "down");
+    await expect(
+      reorderMaterial(database, crypto.randomUUID(), "up"),
+    ).rejects.toBeInstanceOf(MaterialNotFoundError);
+
+    const after = (await listLibraryMaterials(database))
+      .filter((material) => groupIds.includes(material.id))
+      .map((material) => material.id);
+    expect(after).toEqual(before);
   });
 
   it("renames a standalone Material without changing its identity", async () => {

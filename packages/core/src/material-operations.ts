@@ -127,6 +127,50 @@ export async function listLibraryMaterials(
     .orderBy(asc(materials.position), asc(materials.id));
 }
 
+export async function reorderMaterial(
+  database: Database,
+  materialId: string,
+  direction: "up" | "down",
+): Promise<void> {
+  await database.transaction(async (transaction) => {
+    await transaction.execute(
+      sql`select pg_advisory_xact_lock(1886218352, 0)`,
+    );
+
+    const [material] = await transaction
+      .select()
+      .from(materials)
+      .where(eq(materials.id, materialId));
+    if (!material) throw new MaterialNotFoundError();
+
+    const siblings = await transaction
+      .select()
+      .from(materials)
+      .where(
+        material.parentId === null
+          ? isNull(materials.parentId)
+          : eq(materials.parentId, material.parentId),
+      )
+      .orderBy(asc(materials.position), asc(materials.id));
+    const currentIndex = siblings.findIndex(({ id }) => id === materialId);
+    const nextIndex = currentIndex + (direction === "up" ? -1 : 1);
+    if (currentIndex < 0) throw new MaterialNotFoundError();
+    if (nextIndex < 0 || nextIndex >= siblings.length) return;
+
+    const reorderedSiblings = [...siblings];
+    const [movedMaterial] = reorderedSiblings.splice(currentIndex, 1);
+    if (!movedMaterial) throw new MaterialNotFoundError();
+    reorderedSiblings.splice(nextIndex, 0, movedMaterial);
+
+    for (const [position, sibling] of reorderedSiblings.entries()) {
+      await transaction
+        .update(materials)
+        .set({ position })
+        .where(eq(materials.id, sibling.id));
+    }
+  });
+}
+
 export async function listLibraryMaterialTree(
   database: Database,
 ): Promise<MaterialTreeNode[]> {
