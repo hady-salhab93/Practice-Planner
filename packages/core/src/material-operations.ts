@@ -10,6 +10,7 @@ import {
 } from "./schema.js";
 
 type Database = NodePgDatabase<typeof schema>;
+const titleCollator = new Intl.Collator("en-US", { sensitivity: "base" });
 
 export type MaterialTreeNode = Material & {
   children: MaterialTreeNode[];
@@ -125,6 +126,22 @@ export async function listLibraryMaterials(
     .from(materials)
     .where(isNull(materials.parentId))
     .orderBy(asc(materials.position), asc(materials.id));
+}
+
+export function sortMaterialTreeByTitle(
+  tree: MaterialTreeNode[],
+  direction: "asc" | "desc",
+): MaterialTreeNode[] {
+  return tree
+    .map((material) => ({
+      ...material,
+      children: sortMaterialTreeByTitle(material.children, direction),
+    }))
+    .sort((first, second) => {
+      const titleOrder = titleCollator.compare(first.title, second.title);
+      if (titleOrder === 0) return first.id.localeCompare(second.id);
+      return direction === "asc" ? titleOrder : -titleOrder;
+    });
 }
 
 export async function listLibraryMaterialTree(

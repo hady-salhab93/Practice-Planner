@@ -1,14 +1,14 @@
 ---
-name: Reorder Material
+name: Sort Material by title
 status: planned
 blocked_by: [02-break-down-material.md]
 ---
 
-# Reorder Material
+# Sort Material by title
 
 ## Outcome
 
-The guitarist can arrange standalone Material and children in a personally useful sequence.
+The guitarist can sort standalone Material and children within a parent by title.
 
 Source: [approved PRD](../../features/material-management.md). Apply the shared [delivery contract and gates](README.md).
 
@@ -18,13 +18,11 @@ Source: [approved PRD](../../features/material-management.md). Apply the shared 
 
 ## Acceptance Criteria
 
-- [ ] Manually change the order of standalone Material and of children within a parent.
-- [ ] The chosen order survives navigation and reload.
-- [ ] Reordering changes only sibling order, not Material identity, parentage, descendants, or content.
-- [ ] Reordering one group leaves the order of other groups unchanged.
-- [ ] Failed reorder operations preserve the saved sequence and leave the user able to retry.
-- [ ] Verify the user-facing operation and persisted sequence for both standalone and nested groups.
+- [ ] Sort standalone Material and children within each parent by title A-Z or Z-A.
+- [ ] The selected sort direction survives reload.
+- [ ] Sorting changes only displayed sibling order, not saved positions, Material identity, parentage, descendants, or content.
+- [ ] Verify the sort control for standalone and nested Material.
 
 ## Exclusions
 
-Moving between parents and automatic sorting or prioritization. Order preservation through archiving/restoration is integrated in Slice 7.
+Manual arrangement, moving between parents, and sorting by fields other than title. Saved order preservation through archiving/restoration is integrated in Slice 7.

@@ -11,6 +11,7 @@ import {
   listLibraryMaterialTree,
   listLibraryMaterials,
   renameMaterial,
+  sortMaterialTreeByTitle,
   updateMaterialMetadata,
 } from "./material-operations.js";
 import { materials } from "./schema.js";
@@ -132,6 +133,85 @@ describe("Material operations", () => {
     expect(savedChapter?.children.map((material) => material.id)).toContain(
       renamedExercise.id,
     );
+  });
+
+  it("sorts each sibling group by title without changing saved positions", async () => {
+    const zebraRoot = await createStandaloneMaterial(
+      database,
+      `Zebra root ${crypto.randomUUID()}`,
+    );
+    const alphaRoot = await createStandaloneMaterial(
+      database,
+      `Alpha root ${crypto.randomUUID()}`,
+    );
+    const parent = await createStandaloneMaterial(
+      database,
+      `Parent ${crypto.randomUUID()}`,
+    );
+    const otherParent = await createStandaloneMaterial(
+      database,
+      `Other parent ${crypto.randomUUID()}`,
+    );
+    const zebraChild = await createChildMaterial(
+      database,
+      parent.id,
+      `Zebra child ${crypto.randomUUID()}`,
+    );
+    const alphaChild = await createChildMaterial(
+      database,
+      parent.id,
+      `Alpha child ${crypto.randomUUID()}`,
+    );
+    const otherChild = await createChildMaterial(
+      database,
+      otherParent.id,
+      `Other child ${crypto.randomUUID()}`,
+    );
+    const rootIds = [zebraRoot.id, alphaRoot.id];
+    const savedRootOrder = (await listLibraryMaterials(database))
+      .filter((material) => rootIds.includes(material.id))
+      .map((material) => material.id);
+    const originalTree = await listLibraryMaterialTree(database);
+    const ascending = sortMaterialTreeByTitle(originalTree, "asc");
+    const descending = sortMaterialTreeByTitle(originalTree, "desc");
+    const ascendingParent = ascending.find(
+      (material) => material.id === parent.id,
+    );
+    const descendingParent = descending.find(
+      (material) => material.id === parent.id,
+    );
+
+    expect(
+      ascending
+        .filter((material) => rootIds.includes(material.id))
+        .map((material) => material.id),
+    ).toEqual([alphaRoot.id, zebraRoot.id]);
+    expect(
+      descending
+        .filter((material) => rootIds.includes(material.id))
+        .map((material) => material.id),
+    ).toEqual([zebraRoot.id, alphaRoot.id]);
+    expect(ascendingParent?.children.map((material) => material.id)).toEqual([
+      alphaChild.id,
+      zebraChild.id,
+    ]);
+    expect(descendingParent?.children.map((material) => material.id)).toEqual([
+      zebraChild.id,
+      alphaChild.id,
+    ]);
+    expect(
+      ascending.find((material) => material.id === otherParent.id)?.children,
+    ).toMatchObject([{ id: otherChild.id, parentId: otherParent.id }]);
+    expect(
+      originalTree.find((material) => material.id === parent.id)?.children.map(
+        (material) => material.id,
+      ),
+    ).toEqual([zebraChild.id, alphaChild.id]);
+    expect(
+      (await listLibraryMaterials(database))
+        .filter((material) => rootIds.includes(material.id))
+        .map((material) => material.id),
+    ).toEqual(savedRootOrder);
   });
 
   it("renames a standalone Material without changing its identity", async () => {
