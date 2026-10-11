@@ -1,15 +1,38 @@
-import { and, asc, eq, isNull, max, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, max, notInArray, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema.js";
 import {
   materials,
+  materialReferences,
   normalizedTitleExpression,
   type Material,
+  type MaterialReference,
 } from "./schema.js";
 
 type Database = NodePgDatabase<typeof schema>;
 
-export type MaterialTreeNode = Material & { children: MaterialTreeNode[] };
+export type MaterialTreeNode = Material & {
+  children: MaterialTreeNode[];
+  references: MaterialReference[];
+};
+
+export type MaterialReferenceInput = {
+  id?: string;
+  label: string | null;
+  url: string;
+};
+
+export type MaterialMetadata = {
+  description: string;
+  references: MaterialReferenceInput[];
+};
+
+export class InvalidMaterialReferenceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidMaterialReferenceError";
+  }
+}
 
 export class InvalidMaterialTitleError extends Error {
   constructor() {
@@ -107,15 +130,27 @@ export async function listLibraryMaterials(
 export async function listLibraryMaterialTree(
   database: Database,
 ): Promise<MaterialTreeNode[]> {
-  const rows = await database
-    .select()
-    .from(materials)
-    .orderBy(asc(materials.position), asc(materials.id));
+  const [rows, references] = await Promise.all([
+    database
+      .select()
+      .from(materials)
+      .orderBy(asc(materials.position), asc(materials.id)),
+    database
+      .select()
+      .from(materialReferences)
+      .orderBy(asc(materialReferences.position), asc(materialReferences.id)),
+  ]);
   const nodes = new Map<string, MaterialTreeNode>();
   const roots: MaterialTreeNode[] = [];
 
   for (const material of rows) {
-    nodes.set(material.id, { ...material, children: [] });
+    nodes.set(material.id, {
+      ...material,
+      children: [],
+      references: references.filter(
+        (reference) => reference.materialId === material.id,
+      ),
+    });
   }
 
   for (const material of rows) {
@@ -132,6 +167,116 @@ export async function listLibraryMaterialTree(
   }
 
   return roots;
+}
+
+export async function updateMaterialMetadata(
+  database: Database,
+  materialId: string,
+  metadata: MaterialMetadata,
+): Promise<Material & { references: MaterialReference[] }> {
+  const normalizedReferences = metadata.references.map((reference) => ({
+    ...reference,
+    label: reference.label?.trim() || null,
+    url: normalizeReferenceUrl(reference.url),
+  }));
+  const referenceIds = normalizedReferences.flatMap((reference) =>
+    reference.id ? [reference.id] : [],
+  );
+  if (new Set(referenceIds).size !== referenceIds.length) {
+    throw new InvalidMaterialReferenceError(
+      "A reference cannot be included more than once.",
+    );
+  }
+
+  return database.transaction(async (transaction) => {
+    const [existingMaterial] = await transaction
+      .select()
+      .from(materials)
+      .where(eq(materials.id, materialId));
+    if (!existingMaterial) throw new MaterialNotFoundError();
+
+    const existingReferences = await transaction
+      .select()
+      .from(materialReferences)
+      .where(eq(materialReferences.materialId, materialId));
+    const existingIds = new Set(existingReferences.map(({ id }) => id));
+    if (referenceIds.some((id) => !existingIds.has(id))) {
+      throw new InvalidMaterialReferenceError(
+        "One of these references no longer belongs to this Material. Reload and try again.",
+      );
+    }
+
+    const [updatedMaterial] = await transaction
+      .update(materials)
+      .set({ description: metadata.description || null })
+      .where(eq(materials.id, materialId))
+      .returning();
+    if (!updatedMaterial) throw new MaterialNotFoundError();
+
+    const retainedIds = new Set(referenceIds);
+    const removedIds = existingReferences
+      .filter(({ id }) => !retainedIds.has(id))
+      .map(({ id }) => id);
+    if (removedIds.length > 0) {
+      await transaction
+        .delete(materialReferences)
+        .where(
+          and(
+            eq(materialReferences.materialId, materialId),
+            notInArray(materialReferences.id, referenceIds),
+          ),
+        );
+    }
+
+    for (const [position, reference] of normalizedReferences.entries()) {
+      const values = {
+        label: reference.label,
+        url: reference.url,
+        position,
+      };
+      if (reference.id) {
+        await transaction
+          .update(materialReferences)
+          .set(values)
+          .where(
+            and(
+              eq(materialReferences.id, reference.id),
+              eq(materialReferences.materialId, materialId),
+            ),
+          );
+      } else {
+        await transaction.insert(materialReferences).values({
+          ...values,
+          materialId,
+        });
+      }
+    }
+
+    const savedReferences = await transaction
+      .select()
+      .from(materialReferences)
+      .where(eq(materialReferences.materialId, materialId))
+      .orderBy(asc(materialReferences.position), asc(materialReferences.id));
+    return { ...updatedMaterial, references: savedReferences };
+  });
+}
+
+function normalizeReferenceUrl(url: string): string {
+  const normalizedUrl = url.trim();
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(normalizedUrl);
+  } catch {
+    throw new InvalidMaterialReferenceError(
+      "Enter a valid web address for each reference.",
+    );
+  }
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new InvalidMaterialReferenceError(
+      "Reference links must use HTTP or HTTPS.",
+    );
+  }
+  return normalizedUrl;
 }
 
 export async function renameMaterial(

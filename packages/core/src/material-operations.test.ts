@@ -11,6 +11,7 @@ import {
   listLibraryMaterialTree,
   listLibraryMaterials,
   renameMaterial,
+  updateMaterialMetadata,
 } from "./material-operations.js";
 import { materials } from "./schema.js";
 import * as schema from "./schema.js";
@@ -147,6 +148,66 @@ describe("Material operations", () => {
     expect(library.find((material) => material.id === original.id)?.title).toBe(
       title,
     );
+  });
+
+  it("persists descriptions and independently identified references", async () => {
+    const material = await createStandaloneMaterial(
+      database,
+      `Metadata ${crypto.randomUUID()}`,
+    );
+
+    const saved = await updateMaterialMetadata(database, material.id, {
+      description: "First line\nSecond line",
+      references: [
+        { label: "Tab", url: "https://example.com/tab" },
+        { label: null, url: "https://example.com/lesson" },
+        { label: "Notation", url: "https://example.com/notation" },
+      ],
+    });
+    const reloaded = await listLibraryMaterialTree(database);
+    const savedMaterial = reloaded.find((entry) => entry.id === material.id);
+
+    expect(saved.id).toBe(material.id);
+    expect(savedMaterial).toMatchObject({
+      description: "First line\nSecond line",
+      references: [
+        { label: "Tab", url: "https://example.com/tab" },
+        { label: null, url: "https://example.com/lesson" },
+        { label: "Notation", url: "https://example.com/notation" },
+      ],
+    });
+    expect(savedMaterial?.references[0]?.id).toBe(saved.references[0]?.id);
+
+    const updated = await updateMaterialMetadata(database, material.id, {
+      description: "",
+      references: [
+        {
+          id: saved.references[0]?.id,
+          label: "Updated tab",
+          url: "https://example.com/tab-updated",
+        },
+        {
+          id: saved.references[2]?.id,
+          label: "Notation",
+          url: "https://example.com/notation",
+        },
+      ],
+    });
+
+    expect(updated.id).toBe(material.id);
+    expect(updated.description).toBeNull();
+    expect(updated.references).toEqual([
+      {
+        ...saved.references[0],
+        label: "Updated tab",
+        url: "https://example.com/tab-updated",
+        position: 0,
+      },
+      {
+        ...saved.references[2],
+        position: 1,
+      },
+    ]);
   });
 
   it("rejects normalized duplicate titles and identifies the existing Material", async () => {

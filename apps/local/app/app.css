@@ -108,7 +108,22 @@ input {
   font-size: 0.9rem;
 }
 
+textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 7rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  background: var(--background);
+  font: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
 input:focus-visible,
+textarea:focus-visible,
 button:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
@@ -170,7 +185,7 @@ button:focus-visible {
 .material-row {
   min-height: 3rem;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
   padding: 0.4rem 0.35rem;
@@ -186,8 +201,16 @@ button:focus-visible {
   min-width: 0;
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.35rem;
+}
+
+.material-copy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 0.2rem;
+  padding-block: 0.15rem;
 }
 
 .material-disclosure,
@@ -239,6 +262,161 @@ button:focus-visible {
   overflow-wrap: anywhere;
   font-size: 0.95rem;
   font-weight: 500;
+}
+
+.material-details {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem 0.75rem 2.2rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.material-description {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.material-references {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 0;
+  padding: 0;
+  color: var(--muted-foreground);
+  list-style: none;
+}
+
+.material-references li {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.material-references a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: inherit;
+  text-underline-offset: 0.15em;
+}
+
+.material-panel {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(32rem, 100vw);
+  height: 100dvh;
+  max-width: 100vw;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--foreground);
+  background: var(--background);
+  box-shadow: -0.5rem 0 1.5rem oklch(0 0 0 / 18%);
+}
+
+.material-panel::backdrop {
+  background: oklch(0 0 0 / 35%);
+}
+
+.material-panel-form {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.material-panel-header,
+.material-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+}
+
+.material-panel-header {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border);
+}
+
+.material-panel-header h2 {
+  max-width: 26rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.material-panel-header .page-context {
+  margin-bottom: 0.35rem;
+}
+
+.panel-close {
+  width: 2.25rem;
+  flex: 0 0 2.25rem;
+  padding: 0;
+}
+
+.material-panel-content {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 0.65rem;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+}
+
+.reference-editor {
+  min-width: 0;
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.reference-editor legend {
+  padding-inline: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.reference-editor-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.6rem;
+}
+
+.reference-fields {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+  gap: 0.6rem;
+}
+
+.reference-fields > div {
+  min-width: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.add-reference {
+  justify-self: start;
+}
+
+.material-panel-footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
 }
 
 .rename-form {
@@ -318,6 +496,11 @@ button:focus-visible {
 
   .material-row {
     align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .material-heading {
+    flex-basis: 100%;
   }
 
   .material-children {
@@ -327,9 +510,27 @@ button:focus-visible {
 
   .material-actions {
     gap: 0.25rem;
+    max-width: 100%;
+    flex-wrap: wrap;
+    margin-inline-start: 1.8rem;
   }
 
   .rename-button {
     flex: 0 0 auto;
+  }
+
+  .material-panel-header,
+  .material-panel-content,
+  .material-panel-footer {
+    padding-inline: 1rem;
+  }
+
+  .reference-editor-row,
+  .reference-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reference-editor-row > .button {
+    justify-self: start;
   }
 }

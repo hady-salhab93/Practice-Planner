@@ -22,6 +22,7 @@ export const materials = pgTable(
   {
     id: uuid().defaultRandom().primaryKey(),
     title: text().notNull(),
+    description: text(),
     parentId: uuid("parent_id").references((): AnyPgColumn => materials.id, {
       onDelete: "cascade",
     }),
@@ -43,3 +44,15 @@ export const materials = pgTable(
 );
 
 export type Material = typeof materials.$inferSelect;
+
+export const materialReferences = pgTable("material_references", {
+  id: uuid().defaultRandom().primaryKey(),
+  materialId: uuid("material_id")
+    .notNull()
+    .references(() => materials.id, { onDelete: "cascade" }),
+  label: text(),
+  url: text().notNull(),
+  position: integer().notNull().default(0),
+});
+
+export type MaterialReference = typeof materialReferences.$inferSelect;
