@@ -1,6 +1,6 @@
 ---
 name: Break Material into nested pieces
-status: planned
+status: complete
 blocked_by: [01-capture-and-rename.md]
 ---
 
@@ -18,13 +18,13 @@ Source: [approved PRD](../../features/material-management.md). Apply the shared 
 
 ## Acceptance Criteria
 
-- [ ] Add children beneath standalone Material and beneath other children, without mandatory levels or types.
-- [ ] Browse Book > Chapter > Exercise and Song > Solo > Passage > Bars in context; the hierarchy survives reload.
-- [ ] Each Material has at most one parent; adding children preserves the existing parent's identity and content.
-- [ ] Create or rename children using explicit Save/Cancel, retaining input after failures and warning before leaving unsaved edits.
-- [ ] Reject a title conflict within the same parent using the agreed case/space comparison; allow the same title under different parents.
-- [ ] New children appear at the end of their sibling group; creating children does not reorder other groups.
-- [ ] Verify nested creation, sibling uniqueness, and persisted parent-child relationships through the real workflow.
+- [x] Add children beneath standalone Material and beneath other children, without mandatory levels or types.
+- [x] Browse Book > Chapter > Exercise and Song > Solo > Passage > Bars in context; the hierarchy survives reload.
+- [x] Each Material has at most one parent; adding children preserves the existing parent's identity and content.
+- [x] Create or rename children using explicit Save/Cancel, retaining input after failures and warning before leaving unsaved edits.
+- [x] Reject a title conflict within the same parent using the agreed case/space comparison; allow the same title under different parents.
+- [x] New children appear at the end of their sibling group; creating children does not reorder other groups.
+- [x] Verify nested creation, sibling uniqueness, and persisted parent-child relationships through the real workflow.
 
 ## Exclusions
 
