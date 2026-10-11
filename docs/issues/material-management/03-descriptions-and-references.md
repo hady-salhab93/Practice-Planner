@@ -1,6 +1,6 @@
 ---
 name: Describe Material and manage references
-status: planned
+status: complete
 blocked_by: [01-capture-and-rename.md]
 ---
 
@@ -18,12 +18,12 @@ Source: [approved PRD](../../features/material-management.md). Apply the shared 
 
 ## Acceptance Criteria
 
-- [ ] Add, edit, or clear an optional plain-text description; preserve line breaks when saved and displayed.
-- [ ] Add multiple reference links, with or without labels, and view the saved references with their Material.
-- [ ] Edit link destinations and labels and remove links independently, without changing unrelated references or Material identity.
-- [ ] Use explicit Save/Cancel; cancelled edits leave saved metadata unchanged.
-- [ ] Warn before leaving unsaved changes and preserve relevant entered values after failed saves.
-- [ ] Metadata survives navigation and reload; verify the complete persistence workflow and failure behavior.
+- [x] Add, edit, or clear an optional plain-text description; preserve line breaks when saved and displayed.
+- [x] Add multiple reference links, with or without labels, and view the saved references with their Material.
+- [x] Edit link destinations and labels and remove links independently, without changing unrelated references or Material identity.
+- [x] Use explicit Save/Cancel; cancelled edits leave saved metadata unchanged.
+- [x] Warn before leaving unsaved changes and preserve relevant entered values after failed saves.
+- [x] Metadata survives navigation and reload; verify the complete persistence workflow and failure behavior.
 
 ## Exclusions
 
