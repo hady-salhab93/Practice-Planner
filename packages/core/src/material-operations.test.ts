@@ -6,7 +6,9 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  createChildMaterial,
   createStandaloneMaterial,
+  listLibraryMaterialTree,
   listLibraryMaterials,
   renameMaterial,
 } from "./material-operations.js";
@@ -62,6 +64,72 @@ describe("Material operations", () => {
     expect(library.at(-1)?.id).toBe(last.id);
     expect(library.find((material) => material.id === first.id)?.title).toBe(
       first.title,
+    );
+  });
+
+  it("creates nested Material in order and scopes title uniqueness to siblings", async () => {
+    const parent = await createStandaloneMaterial(
+      database,
+      `Parent ${crypto.randomUUID()}`,
+    );
+    const otherParent = await createStandaloneMaterial(
+      database,
+      `Other parent ${crypto.randomUUID()}`,
+    );
+    const chapter = await createChildMaterial(
+      database,
+      parent.id,
+      `Chapter ${crypto.randomUUID()}`,
+    );
+    const nextChapter = await createChildMaterial(
+      database,
+      parent.id,
+      `Next chapter ${crypto.randomUUID()}`,
+    );
+    const exercise = await createChildMaterial(
+      database,
+      chapter.id,
+      `Exercise ${crypto.randomUUID()}`,
+    );
+    const renamedExercise = await renameMaterial(
+      database,
+      exercise.id,
+      `Renamed exercise ${crypto.randomUUID()}`,
+    );
+    const sameTitleElsewhere = await createChildMaterial(
+      database,
+      otherParent.id,
+      chapter.title,
+    );
+    const library = await listLibraryMaterialTree(database);
+    const savedParent = library.find((material) => material.id === parent.id);
+    const savedChapter = savedParent?.children.find(
+      (material) => material.id === chapter.id,
+    );
+
+    await expect(
+      createChildMaterial(
+        database,
+        parent.id,
+        ` ${chapter.title.toUpperCase()} `,
+      ),
+    ).rejects.toMatchObject({
+      name: "MaterialTitleConflictError",
+      conflictingMaterial: { id: chapter.id, title: chapter.title },
+    });
+
+    expect(chapter.parentId).toBe(parent.id);
+    expect(exercise.parentId).toBe(chapter.id);
+    expect(renamedExercise.id).toBe(exercise.id);
+    expect(renamedExercise.parentId).toBe(chapter.id);
+    expect(sameTitleElsewhere.parentId).toBe(otherParent.id);
+    expect(sameTitleElsewhere.title).toBe(chapter.title);
+    expect(savedParent?.children.map((material) => material.id)).toContain(
+      nextChapter.id,
+    );
+    expect(savedParent?.children[0]?.id).toBe(chapter.id);
+    expect(savedChapter?.children.map((material) => material.id)).toContain(
+      renamedExercise.id,
     );
   });
 

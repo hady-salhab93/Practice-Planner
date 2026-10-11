@@ -9,6 +9,8 @@ import {
 
 type Database = NodePgDatabase<typeof schema>;
 
+export type MaterialTreeNode = Material & { children: MaterialTreeNode[] };
+
 export class InvalidMaterialTitleError extends Error {
   constructor() {
     super("Enter a title for this Material.");
@@ -36,6 +38,22 @@ export async function createStandaloneMaterial(
   database: Database,
   title: string,
 ): Promise<Material> {
+  return createMaterialInGroup(database, title, null);
+}
+
+export async function createChildMaterial(
+  database: Database,
+  parentId: string,
+  title: string,
+): Promise<Material> {
+  return createMaterialInGroup(database, title, parentId);
+}
+
+async function createMaterialInGroup(
+  database: Database,
+  title: string,
+  parentId: string | null,
+): Promise<Material> {
   const normalizedTitle = normalizeTitle(title);
 
   try {
@@ -43,14 +61,26 @@ export async function createStandaloneMaterial(
       await transaction.execute(
         sql`select pg_advisory_xact_lock(1886218352, 0)`,
       );
+      if (parentId !== null) {
+        const [parent] = await transaction
+          .select({ id: materials.id })
+          .from(materials)
+          .where(eq(materials.id, parentId));
+        if (!parent) throw new MaterialNotFoundError();
+      }
       const [lastPosition] = await transaction
         .select({ position: max(materials.position) })
         .from(materials)
-        .where(isNull(materials.parentId));
+        .where(
+          parentId === null
+            ? isNull(materials.parentId)
+            : eq(materials.parentId, parentId),
+        );
       const [material] = await transaction
         .insert(materials)
         .values({
           title: normalizedTitle,
+          parentId,
           position: (lastPosition?.position ?? -1) + 1,
         })
         .returning();
@@ -60,7 +90,7 @@ export async function createStandaloneMaterial(
     });
   } catch (error) {
     if (!isTitleUniqueViolation(error)) throw error;
-    throw await findTitleConflict(database, normalizedTitle);
+    throw await findTitleConflict(database, normalizedTitle, parentId);
   }
 }
 
@@ -74,25 +104,61 @@ export async function listLibraryMaterials(
     .orderBy(asc(materials.position), asc(materials.id));
 }
 
+export async function listLibraryMaterialTree(
+  database: Database,
+): Promise<MaterialTreeNode[]> {
+  const rows = await database
+    .select()
+    .from(materials)
+    .orderBy(asc(materials.position), asc(materials.id));
+  const nodes = new Map<string, MaterialTreeNode>();
+  const roots: MaterialTreeNode[] = [];
+
+  for (const material of rows) {
+    nodes.set(material.id, { ...material, children: [] });
+  }
+
+  for (const material of rows) {
+    const node = nodes.get(material.id);
+    if (!node) continue;
+
+    if (material.parentId === null) {
+      roots.push(node);
+      continue;
+    }
+
+    const parent = nodes.get(material.parentId);
+    if (parent) parent.children.push(node);
+  }
+
+  return roots;
+}
+
 export async function renameMaterial(
   database: Database,
   materialId: string,
   title: string,
 ): Promise<Material> {
   const normalizedTitle = normalizeTitle(title);
+  const [existing] = await database
+    .select({ parentId: materials.parentId })
+    .from(materials)
+    .where(eq(materials.id, materialId));
+
+  if (!existing) throw new MaterialNotFoundError();
 
   try {
     const [material] = await database
       .update(materials)
       .set({ title: normalizedTitle })
-      .where(and(eq(materials.id, materialId), isNull(materials.parentId)))
+      .where(eq(materials.id, materialId))
       .returning();
 
     if (!material) throw new MaterialNotFoundError();
     return material;
   } catch (error) {
     if (!isTitleUniqueViolation(error)) throw error;
-    throw await findTitleConflict(database, normalizedTitle);
+    throw await findTitleConflict(database, normalizedTitle, existing.parentId);
   }
 }
 
@@ -124,13 +190,16 @@ function isTitleUniqueViolation(error: unknown): boolean {
 async function findTitleConflict(
   database: Database,
   title: string,
+  parentId: string | null,
 ): Promise<MaterialTitleConflictError> {
   const [conflictingMaterial] = await database
     .select()
     .from(materials)
     .where(
       and(
-        isNull(materials.parentId),
+        parentId === null
+          ? isNull(materials.parentId)
+          : eq(materials.parentId, parentId),
         sql`${normalizedTitleExpression(materials.title)} = lower(${title})`,
       ),
     )
