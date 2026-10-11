@@ -4,7 +4,7 @@
 
 The application's Library contains Material and its Sprints describe practice focus. Development work items track building the application; they are not Material or practice Sprints.
 
-The [documentation map](../README.md) indexes approved feature PRDs and local implementation breakdowns. The [Material management slices](../issues/material-management/README.md) are approved for planning, not authorization to start implementation. No GitHub or Azure DevOps development tracker, remote repository, or autonomous issue-label workflow is selected.
+The [documentation map](../README.md) indexes approved feature PRDs and local implementation breakdowns. The [Material management slices](../issues/material-management/README.md) are approved for planning, not authorization to start implementation. GitHub Issues in `hady-salheb93/Practice-Planner` is the selected development tracker; see [issue-tracker guidance](issue-tracker.md). No autonomous issue-label workflow is selected.
 
 ## Before Publishing Work
 

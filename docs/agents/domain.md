@@ -2,9 +2,9 @@
 
 ## Before Exploring Or Planning
 
-1. Read the [glossary](../../GLOSSARY.md) before naming concepts. Its vocabulary and behavioral descriptions are provisional following the product-planning reset.
-2. Read the approved feature PRD and relevant decisions when they exist. Until then, establish requirements through feature interviews rather than treating the previous model as settled.
-3. Consult the retained architecture ADRs for technical constraints, not product requirements.
+1. Read the root [glossary](../../GLOSSARY.md) before naming concepts. If a root `GLOSSARY-MAP.md` is added, use it to locate the relevant context glossary. The current single-context layout has one root glossary; its behavioral descriptions remain provisional following the product-planning reset.
+2. Read the approved feature PRD and relevant decisions when they exist. Until a feature has an approved PRD, establish requirements through feature interviews rather than treating the previous model as settled.
+3. Read relevant ADRs under [`docs/adr/`](../adr/) for technical constraints, not product requirements. The current single-context layout keeps ADRs at the repository root.
 
 ## During Discussion
 

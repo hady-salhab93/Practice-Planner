@@ -1,6 +1,6 @@
 # Material Management Implementation Slices
 
-Breakdown approved on 2026-10-11 from the [Material Management and Breakdown PRD](../../features/material-management.md). These are local implementation issue documents, not published tracker issues. Approval covers the breakdown; starting implementation requires an explicit task.
+Breakdown approved on 2026-10-11 from the [Material Management and Breakdown PRD](../../features/material-management.md). Its parent specification is published as [#9 Material Management and Breakdown](https://github.com/hady-salhab93/Practice-Planner/issues/9), with the eight GitHub issues below linked as native sub-issues. These local documents preserve the approved slice details. Approval covers the breakdown, not implementation; starting implementation requires an explicit task.
 
 ## Delivery Contract
 
@@ -8,24 +8,24 @@ Each slice delivers a usable workflow through the UI in `apps/local`, React Rout
 
 All slices follow the [glossary](../../../GLOSSARY.md), [frontend standards](../../FRONTEND_STANDARDS.md), [testing standards](../../TESTING_STANDARDS.md), and [running checks](../../agents/testing.md). Verify user-visible success and failure paths, persistence after reload, and relevant integrity risks. An unchecked criterion describes future work, not passing verification.
 
-`planned` means an approved slice that is not implemented or automatically ready to start. `blocked` additionally identifies unresolved contracts beyond preceding slices. Read each issue's dependencies and this index before starting. Dependency lists describe required outcomes; a preceding file's existence does not satisfy them.
+`planned` means an approved slice that is not implemented or automatically ready to start. `blocked` additionally identifies unresolved contracts beyond preceding slices. `complete` means the slice's acceptance criteria have been verified. Read each issue's dependencies and this index before starting. Dependency lists describe required outcomes; a preceding file's existence does not satisfy them.
 
 ## Slices
 
-| Slice | Issue                                                                        | Dependencies                                               | Status  |
-| ----- | ---------------------------------------------------------------------------- | ---------------------------------------------------------- | ------- |
-| 1     | [Capture and rename standalone Material](01-capture-and-rename.md)           | Database setup decision and usable persistence environment | Planned |
-| 2     | [Break Material into nested pieces](02-break-down-material.md)               | Slice 1                                                    | Planned |
-| 3     | [Describe Material and manage references](03-descriptions-and-references.md) | Slice 1                                                    | Planned |
-| 4     | [Reorder Material](04-reorder-material.md)                                   | Slice 2                                                    | Planned |
-| 5     | [Move Material with its descendants](05-move-material.md)                    | Slices 2 and 4                                             | Planned |
-| 6     | [Find Material in context](06-find-material.md)                              | Slice 2                                                    | Planned |
-| 7     | [Archive and restore Material](07-archive-and-restore.md)                    | Slices 3, 4, 5, and 6, transitively Slice 2                | Planned |
-| 8     | [Delete unused Material safely](08-delete-unused-material.md)                | Slice 7 and real Sprint/practice-reference contracts       | Blocked |
+| Slice | Issue                                                                        | GitHub issue                                                     | Dependencies                                             | Status   |
+| ----- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------- | -------- |
+| 1     | [Capture and rename standalone Material](01-capture-and-rename.md)           | [#1](https://github.com/hady-salheb93/Practice-Planner/issues/1) | Local Docker Compose PostgreSQL, persistent named volume | Complete |
+| 2     | [Break Material into nested pieces](02-break-down-material.md)               | [#2](https://github.com/hady-salhab93/Practice-Planner/issues/2) | Slice 1                                                  | Planned  |
+| 3     | [Describe Material and manage references](03-descriptions-and-references.md) | [#3](https://github.com/hady-salhab93/Practice-Planner/issues/3) | Slice 1                                                  | Planned  |
+| 4     | [Reorder Material](04-reorder-material.md)                                   | [#4](https://github.com/hady-salhab93/Practice-Planner/issues/4) | Slice 2                                                  | Planned  |
+| 5     | [Move Material with its descendants](05-move-material.md)                    | [#5](https://github.com/hady-salhab93/Practice-Planner/issues/5) | Slices 2 and 4                                           | Planned  |
+| 6     | [Find Material in context](06-find-material.md)                              | [#6](https://github.com/hady-salhab93/Practice-Planner/issues/6) | Slice 2                                                  | Planned  |
+| 7     | [Archive and restore Material](07-archive-and-restore.md)                    | [#7](https://github.com/hady-salhab93/Practice-Planner/issues/7) | Slices 3, 4, 5, and 6, transitively Slice 2              | Planned  |
+| 8     | [Delete unused Material safely](08-delete-unused-material.md)                | [#8](https://github.com/hady-salhab93/Practice-Planner/issues/8) | Slice 7 and real Sprint/practice-reference contracts     | Blocked  |
 
 ## Cross-Feature Gates
 
-- **Database setup:** resolve the placement and setup decisions needed for the first slice using [stack planning](../../STACK_PLANNING.md). Do not provision a host or choose unresolved infrastructure implicitly.
+- **Database setup:** Slice 1 uses local Docker Compose PostgreSQL on localhost with a persistent named volume; backups are deferred. See [stack planning](../../STACK_PLANNING.md). This does not approve production hosting or other infrastructure.
 - **Deletion protection:** Slice 8 requires approved and implemented Sprint-reference and practice-record contracts. Do not invent those schemas or hardcode a permanently empty protection check.
 - **Planned/active Sprint integration:** resolve how breakdown, moves, archiving, and restoration affect commitments before connecting Library mutations to Sprints. Relevant Library-only slices do not prove those interactions.
 - **Running-timer integration:** resolve hierarchy/archive changes during timing and future timing eligibility in the timing interview. Do not silently start, stop, or retarget a timer from Library actions.
