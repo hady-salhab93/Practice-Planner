@@ -239,29 +239,27 @@ button:focus-visible {
 .material-actions {
   display: flex;
   flex: 0 0 auto;
-  flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 0.5rem;
 }
 
-.material-order-form {
+.library-sort {
   display: flex;
-  gap: 0.15rem;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
-.material-actions .material-order-form .button-secondary {
-  width: 2rem;
+.library-sort .button {
   min-height: 2rem;
-  padding: 0;
+  padding: 0.3rem 0.55rem;
+  border: 0;
+  border-radius: 0;
 }
 
-.material-actions.material-actions-error {
-  opacity: 1;
-}
-
-.material-order-error {
-  flex-basis: 100%;
-  text-align: right;
+.library-sort .button[aria-pressed="true"] {
+  color: var(--primary-foreground);
+  background: var(--primary);
 }
 
 .material-actions .button-secondary {

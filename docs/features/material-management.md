@@ -18,7 +18,7 @@ This PRD records the feature agreement confirmed by the user on 2026-10-11. It d
 1. As a guitarist, I want to capture material before fully analyzing it so that I can return to it later.
 2. As a guitarist, I want to break large material into smaller pieces so that practice preparation becomes actionable.
 3. As a guitarist, I want descriptions and reference links so that I can remember what a piece refers to.
-4. As a guitarist, I want to search and reorder my Library so that I can find and organize what matters.
+4. As a guitarist, I want to search and sort my Library by title so that I can find and organize what matters.
 5. As a guitarist, I want to move Material without recreating it so that its organization can evolve.
 6. As a guitarist, I want to archive unused Material and delete mistakes so that the Library stays useful without losing practice history.
 
@@ -46,8 +46,9 @@ This PRD records the feature agreement confirmed by the user on 2026-10-11. It d
 - Moving Material carries all descendants and preserves the identity of existing Material rather than making copies.
 - Material can move between parents or become standalone in the Library.
 - Prevent moving Material beneath itself or any descendant.
-- New Material and Material moved into a different group appear at that group's end.
-- Support manual ordering among siblings, including standalone Material. Relative ordering survives archiving and restoration.
+- New Material and Material moved into a different group are appended to the saved sibling sequence.
+- Sort Material by title in ascending (A-Z) or descending (Z-A) order within each sibling group, including standalone Material. The selected direction survives reloads, and sorting does not change saved sibling positions, identity, parentage, descendants, or content.
+- Preserve saved relative sibling positions through archiving and restoration.
 - Restore archived Material before moving it; moving into an archived parent is prohibited.
 
 ### Browsing And Search
@@ -92,7 +93,7 @@ These scenarios are requirements for future verification, not claims of passing 
 4. Create "Warm-up" under two different books successfully. A second " warm-up " under either same book is rejected, even if the existing sibling is archived. The same rule applies to standalone Material.
 5. Move a chapter containing exercises into another book; all descendants move with it. Move an exercise to stand alone. Existing identities and attached practice remain intact.
 6. Attempt a cyclic move or a move into a group with a conflicting title; the operation is rejected without partial changes, merging, replacement, or automatic renaming.
-7. New or moved Material appears at the destination group's end. Manual reordering changes sibling order; archiving and restoring a sibling preserves its relative position.
+7. Sort standalone Material and children within a parent by title A-Z or Z-A. The selected direction survives reloads without changing the saved sibling sequence; archiving and restoring a sibling preserves its saved relative position.
 8. Search for "exercise" and find differently capitalized matching titles across the Library with ancestor context. Open a result in its hierarchy; archived matches appear only in the archived view's search.
 9. Archive one exercise independently, then archive and restore its book. The book and previously visible descendants return; the independently archived exercise stays archived.
 10. Attempt to restore a child beneath an archived ancestor, add children to archived Material, or move archived Material; require ancestor restoration or Material restoration as applicable rather than silently reorganizing the Library.
@@ -107,7 +108,7 @@ These scenarios are requirements for future verification, not claims of passing 
 - Completion, mastery, proficiency, and automatic practice-quality assessment.
 - Mandatory song/book/exercise types, fixed hierarchy levels, or shared Material with multiple parents.
 - File uploads, embedded recordings or sheet music, and rich-text descriptions.
-- Tags, categories, automatic prioritization, merging, and automatic conflict renaming.
+- Tags, categories, automatic prioritization, sorting by fields other than title, merging, and automatic conflict renaming.
 - Sprint selection, timing controls, and report presentation; these belong to their own feature interviews.
 
 ## Dependencies And Open Questions

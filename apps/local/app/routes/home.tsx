@@ -5,10 +5,13 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { useBlocker, useFetcher, useLoaderData } from "react-router";
 import {
-  ArrowDown,
-  ArrowUp,
+  useBlocker,
+  useFetcher,
+  useLoaderData,
+  useSearchParams,
+} from "react-router";
+import {
   Check,
   ChevronDown,
   ChevronRight,
@@ -25,8 +28,8 @@ import {
   listLibraryMaterialTree,
   MaterialNotFoundError,
   MaterialTitleConflictError,
-  reorderMaterial,
   renameMaterial,
+  sortMaterialTreeByTitle,
   updateMaterialMetadata,
   type MaterialTreeNode,
 } from "@practice-planner/core/material-operations";
@@ -121,37 +124,6 @@ export async function action({ request }: Route.ActionArgs) {
     }
   }
 
-  if (intent === "reorder") {
-    const materialId = formData.get("materialId");
-    const direction = formData.get("direction");
-    if (
-      typeof materialId !== "string" ||
-      (direction !== "up" && direction !== "down")
-    ) {
-      return {
-        ok: false,
-        intent,
-        materialId: typeof materialId === "string" ? materialId : "",
-        message: "Select a Material and a direction to reorder it.",
-      };
-    }
-
-    try {
-      await reorderMaterial(database, materialId, direction);
-      return { ok: true, intent, materialId };
-    } catch (error) {
-      return {
-        ok: false,
-        intent,
-        materialId,
-        message:
-          error instanceof MaterialNotFoundError
-            ? getActionErrorMessage(error)
-            : "Could not reorder this Material. The saved order is unchanged; try again.",
-      };
-    }
-  }
-
   if (intent === "metadata") {
     const materialId = formData.get("materialId");
     const referenceIds = formData.getAll("referenceId");
@@ -229,10 +201,12 @@ function isFailedAction(result: unknown): result is { ok: false } {
 
 export default function Home() {
   const { materials } = useLoaderData<typeof loader>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const createFetcher = useFetcher<typeof action>();
   const renameFetcher = useFetcher<typeof action>();
-  const reorderFetcher = useFetcher<typeof action>();
   const metadataFetcher = useFetcher<typeof action>();
+  const sortDirection = searchParams.get("sort") === "desc" ? "desc" : "asc";
+  const sortedMaterials = sortMaterialTreeByTitle(materials, sortDirection);
   const [createTitle, setCreateTitle] = useState("");
   const [childDrafts, setChildDrafts] = useState<Record<string, string>>({});
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
@@ -381,11 +355,14 @@ export default function Home() {
     discardMetadataDraft();
   }
 
-  function renderMaterial(
-    material: MaterialTreeNode,
-    siblingIndex: number,
-    siblingCount: number,
-  ) {
+  function changeSortDirection(direction: "asc" | "desc") {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (direction === "asc") nextSearchParams.delete("sort");
+    else nextSearchParams.set("sort", direction);
+    setSearchParams(nextSearchParams, { preventScrollReset: true });
+  }
+
+  function renderMaterial(material: MaterialTreeNode) {
     const isEditing = editingId === material.id;
     const childTitle = childDrafts[material.id] ?? "";
     const childError =
@@ -402,16 +379,6 @@ export default function Home() {
       !renameFetcher.data.ok
         ? renameFetcher.data.message
         : undefined;
-    const reorderError =
-      reorderFetcher.data?.intent === "reorder" &&
-      reorderFetcher.data.materialId === material.id &&
-      !reorderFetcher.data.ok
-        ? reorderFetcher.data.message
-        : undefined;
-    const orderingDisabled =
-      reorderFetcher.state !== "idle" ||
-      editingId !== null ||
-      editingMetadataId !== null;
     const hasChildren =
       material.children.length > 0 || material.id in childDrafts;
     const isExpanded = expandedIds.has(material.id);
@@ -528,44 +495,7 @@ export default function Home() {
                   )}
                 </div>
               </div>
-              <div
-                className={`material-actions${reorderError ? " material-actions-error" : ""}`}
-              >
-                <reorderFetcher.Form
-                  method="post"
-                  className="material-order-form"
-                >
-                  <input type="hidden" name="intent" value="reorder" />
-                  <input
-                    type="hidden"
-                    name="materialId"
-                    value={material.id}
-                  />
-                  <button
-                    className="button button-secondary"
-                    type="submit"
-                    name="direction"
-                    value="up"
-                    aria-label={`Move ${material.title} up`}
-                    title={`Move ${material.title} up`}
-                    disabled={orderingDisabled || siblingIndex === 0}
-                  >
-                    <ArrowUp aria-hidden="true" size={16} />
-                  </button>
-                  <button
-                    className="button button-secondary"
-                    type="submit"
-                    name="direction"
-                    value="down"
-                    aria-label={`Move ${material.title} down`}
-                    title={`Move ${material.title} down`}
-                    disabled={
-                      orderingDisabled || siblingIndex === siblingCount - 1
-                    }
-                  >
-                    <ArrowDown aria-hidden="true" size={16} />
-                  </button>
-                </reorderFetcher.Form>
+              <div className="material-actions">
                 <button
                   className="button button-secondary"
                   type="button"
@@ -607,11 +537,6 @@ export default function Home() {
                   <Pencil aria-hidden="true" size={16} />
                   Edit details
                 </button>
-                {reorderError && (
-                  <p className="form-error material-order-error" role="alert">
-                    {reorderError}
-                  </p>
-                )}
               </div>
             </>
           )}
@@ -622,9 +547,7 @@ export default function Home() {
             id={`material-children-${material.id}`}
             hidden={!isExpanded}
           >
-            {material.children.map((child, index) =>
-              renderMaterial(child, index, material.children.length),
-            )}
+            {material.children.map(renderMaterial)}
             {material.id in childDrafts && (
               <li className="material-node">
                 <createFetcher.Form
@@ -760,6 +683,28 @@ export default function Home() {
         <section className="library-section" aria-labelledby="library-heading">
           <div className="section-heading">
             <h2 id="library-heading">Your Library</h2>
+            <div
+              className="library-sort"
+              role="group"
+              aria-label="Sort Materials by title"
+            >
+              <button
+                className="button button-secondary"
+                type="button"
+                aria-pressed={sortDirection === "asc"}
+                onClick={() => changeSortDirection("asc")}
+              >
+                Title A-Z
+              </button>
+              <button
+                className="button button-secondary"
+                type="button"
+                aria-pressed={sortDirection === "desc"}
+                onClick={() => changeSortDirection("desc")}
+              >
+                Title Z-A
+              </button>
+            </div>
           </div>
           {materials.length === 0 ? (
             <p className="empty-state">
@@ -767,9 +712,7 @@ export default function Home() {
             </p>
           ) : (
             <ul className="material-list" aria-label="Library Materials">
-              {materials.map((material, index) =>
-                renderMaterial(material, index, materials.length),
-              )}
+              {sortedMaterials.map(renderMaterial)}
             </ul>
           )}
         </section>
