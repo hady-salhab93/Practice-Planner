@@ -18,7 +18,7 @@ Status: product planning has been reset for feature-by-feature discovery. The ar
 
 ## Features
 
-The first Material management slice is implemented: standalone Material can be added to the Library and renamed. See the [approved feature PRD](docs/features/material-management.md) and [implementation slices](docs/issues/material-management/README.md) for scope and remaining work.
+The first Material management slice is implemented: standalone Material can be added to the Library and renamed. See the [approved feature PRD](docs/features/material-management.md) and [GitHub implementation issues](https://github.com/hady-salhab93/Practice-Planner/issues/9) for scope and remaining work.
 
 ## Getting Started
 

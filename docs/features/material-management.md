@@ -142,3 +142,44 @@ Do not implement unresolved interactions by borrowing behavior from the deleted 
 Follow [testing standards](../TESTING_STANDARDS.md) and [running checks](../agents/testing.md). Use focused behavior checks for hierarchy integrity, title conflicts, stable saved sibling sequence, pagination, archive/restoration state, and deletion eligibility. Verify persistence and protected relationships through integration checks, and exercise Save/Cancel, unsaved changes, page/search navigation, and destructive confirmation through user-facing checks. Sort and move behavior is excluded from current-release verification.
 
 Historical preservation scenarios require the later Sprint, timing, and review contracts; they cannot be declared verified by Library-only tests. Use [frontend standards](../FRONTEND_STANDARDS.md) for layout and controls without treating this document as a finalized screen design. Implementation issues and their acceptance criteria will be proposed separately after reviewing this PRD and its dependencies.
+
+## Implementation Backlog And Delivery Contract
+
+[The parent GitHub issue](https://github.com/hady-salhab93/Practice-Planner/issues/9)
+and its sub-issues own the implementation backlog. Local copies of the issue
+breakdown have been removed; consult GitHub for issue state, acceptance criteria,
+and dependencies. Sorting and moving remain deferred, and the
+[pagination spec](library-pagination.md) owns the replacement release scope.
+
+Each implementation slice delivers a usable workflow through the local UI,
+React Router loaders/actions, core domain operations, PostgreSQL persistence,
+and focused tests. Add only the schema, operations, and controls needed by that
+slice; do not replace an end-to-end outcome with separate database, API, and
+frontend projects. Verify visible success and failure paths, persistence after
+reload, and relevant integrity risks. Unchecked criteria are not passing
+verification, and a dependency's document or code existing does not prove its
+required outcome.
+
+### Cross-Feature Safety Gates
+
+- Local PostgreSQL uses Docker Compose on localhost with a persistent named
+  volume. Backups are deferred; this does not approve production infrastructure.
+- Permanent deletion remains blocked until approved and implemented
+  Sprint-reference and practice-record contracts support authoritative subtree
+  eligibility checks. Never invent those schemas or use a permanently empty
+  protection check. Recheck eligibility at the destructive operation so stale
+  confirmation cannot delete newly protected Material.
+- Resolve breakdown, archiving, and restoration effects on planned or active
+  Sprint commitments before connecting Library mutations to Sprints. Revisit
+  move effects only if moving is approved in the future.
+- Resolve hierarchy/archive changes during timing and timing eligibility in the
+  timing feature. Library actions must not silently start, stop, or retarget a
+  timer.
+- Preserve earlier practice on its original Material when children are added.
+  Preserve ended-Sprint names/grouping and access to current Material, including
+  archived Material. Verify these against real timing and review contracts,
+  not invented copies or Library-only tests.
+
+Basic Library outcomes may precede later features. Once Sprints or timers are
+connected, resolve and verify the applicable gates before calling the integrated
+workflow complete.
