@@ -7,24 +7,32 @@ import {
 } from "react";
 import { useBlocker, useFetcher, useLoaderData } from "react-router";
 import {
+  Archive,
   Check,
   ChevronDown,
   ChevronRight,
   ExternalLink,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   X,
 } from "lucide-react";
 import {
+  archiveMaterial,
+  ArchivedMaterialParentError,
+  MaterialArchiveRootOnlyError,
   createChildMaterial,
   createStandaloneMaterial,
   InvalidMaterialTitleError,
   InvalidMaterialReferenceError,
   listLibraryMaterialTree,
+  listArchivedMaterialTree,
   MaterialNotFoundError,
   MaterialTitleConflictError,
   searchLibraryMaterials,
+  searchArchivedMaterials,
+  restoreMaterial,
   updateMaterialMetadata,
   type MaterialTreeNode,
 } from "@practice-planner/core/material-operations";
@@ -43,7 +51,12 @@ type MaterialMetadataDraft = {
 };
 
 export async function loader() {
-  return { materials: await listLibraryMaterialTree(getDatabase()) };
+  const database = getDatabase();
+  const [materials, archivedMaterials] = await Promise.all([
+    listLibraryMaterialTree(database),
+    listArchivedMaterialTree(database),
+  ]);
+  return { materials, archivedMaterials };
 }
 
 export function shouldRevalidate({
@@ -101,25 +114,59 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "search") {
     const rawQuery = formData.get("query");
     const query = typeof rawQuery === "string" ? rawQuery.trim() : "";
+    const rawScope = formData.get("scope");
+    const scope = rawScope === "archive" ? "archive" : "library";
     if (!query) {
       return {
         ok: false,
         intent,
+        scope,
         query,
-        message: "Enter a title to search the Library.",
+        message: `Enter a title to search ${scope === "archive" ? "archived Material" : "the Library"}.`,
       };
     }
 
     try {
-      const results = await searchLibraryMaterials(getDatabase(), query);
-      return { ok: true, intent, query, results };
+      const results =
+        scope === "archive"
+          ? await searchArchivedMaterials(getDatabase(), query)
+          : await searchLibraryMaterials(getDatabase(), query);
+      return { ok: true, intent, scope, query, results };
     } catch {
       return {
         ok: false,
         intent,
+        scope,
         query,
-        message:
-          "Could not search the Library. Your search is still here; try again.",
+        message: `Could not search ${scope === "archive" ? "archived Material" : "the Library"}. Your search is still here; try again.`,
+      };
+    }
+  }
+
+  if (intent === "archive" || intent === "restore") {
+    const materialId = formData.get("materialId");
+    if (typeof materialId !== "string") {
+      return {
+        ok: false,
+        intent,
+        materialId: "",
+        message: "Could not update this Material's archive state. Try again.",
+      };
+    }
+
+    try {
+      const update = intent === "archive" ? archiveMaterial : restoreMaterial;
+      await update(getDatabase(), materialId);
+      return { ok: true, intent, materialId };
+    } catch (error) {
+      return {
+        ok: false,
+        intent,
+        materialId,
+        message: getActionErrorMessage(
+          error,
+          "Could not update this Material's archive state. Try again.",
+        ),
       };
     }
   }
@@ -179,7 +226,10 @@ export async function action({ request }: Route.ActionArgs) {
   };
 }
 
-function getActionErrorMessage(error: unknown): string {
+function getActionErrorMessage(
+  error: unknown,
+  fallback = "Could not save this Material. Your title is still here; try again.",
+): string {
   if (error instanceof InvalidMaterialReferenceError) return error.message;
   if (error instanceof InvalidMaterialTitleError)
     return "Enter a title for this Material.";
@@ -188,7 +238,12 @@ function getActionErrorMessage(error: unknown): string {
   }
   if (error instanceof MaterialNotFoundError)
     return "This Material is no longer in the Library. Reload and try again.";
-  return "Could not save this Material. Your title is still here; try again.";
+  if (
+    error instanceof MaterialArchiveRootOnlyError ||
+    error instanceof ArchivedMaterialParentError
+  )
+    return error.message;
+  return fallback;
 }
 
 function isFailedAction(result: unknown): result is { ok: false } {
@@ -201,10 +256,12 @@ function isFailedAction(result: unknown): result is { ok: false } {
 }
 
 export default function Home() {
-  const { materials } = useLoaderData<typeof loader>();
+  const { materials, archivedMaterials } = useLoaderData<typeof loader>();
   const createFetcher = useFetcher<typeof action>();
   const searchFetcher = useFetcher<typeof action>();
+  const archiveFetcher = useFetcher<typeof action>();
   const metadataFetcher = useFetcher<typeof action>();
+  const [view, setView] = useState<"library" | "archive">("library");
   const [createTitle, setCreateTitle] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [childDrafts, setChildDrafts] = useState<Record<string, string>>({});
@@ -222,9 +279,14 @@ export default function Home() {
     title: string;
   } | null>(null);
   const submittedMetadataId = useRef<string | null>(null);
-  const editingMetadataMaterial = findMaterial(materials, editingMetadataId);
+  const visibleMaterials = view === "library" ? materials : archivedMaterials;
+  const editingMetadataMaterial = findMaterial(
+    visibleMaterials,
+    editingMetadataId,
+  );
   const currentSearch =
     searchFetcher.data?.intent === "search" &&
+    searchFetcher.data.scope === view &&
     searchFetcher.data.query === searchQuery.trim()
       ? searchFetcher.data
       : undefined;
@@ -338,7 +400,7 @@ export default function Home() {
     !metadataFetcher.data.ok
       ? metadataFetcher.data.message
       : undefined;
-  const materialCount = countMaterials(materials);
+  const materialCount = countMaterials(visibleMaterials);
 
   function discardMetadataDraft() {
     setEditingMetadataId(null);
@@ -365,7 +427,7 @@ export default function Home() {
     setSearchQuery("");
   }
 
-  function renderMaterial(material: MaterialTreeNode) {
+  function renderMaterial(material: MaterialTreeNode, isRoot: boolean) {
     const childTitle = childDrafts[material.id] ?? "";
     const childError =
       createFetcher.data?.intent === "create" &&
@@ -375,7 +437,8 @@ export default function Home() {
         ? createFetcher.data.message
         : undefined;
     const hasChildren =
-      material.children.length > 0 || material.id in childDrafts;
+      material.children.length > 0 ||
+      (view === "library" && material.id in childDrafts);
     const isExpanded = expandedIds.has(material.id);
 
     return (
@@ -387,22 +450,26 @@ export default function Home() {
       >
         <div className="material-row">
           <div className="material-heading">
-            <button
-              className="material-disclosure material-add-child"
-              type="button"
-              aria-label={`Add child to ${material.title}`}
-              title={`Add child to ${material.title}`}
-              onClick={() => {
-                setChildDrafts((drafts) =>
-                  material.id in drafts
-                    ? drafts
-                    : { ...drafts, [material.id]: "" },
-                );
-                setExpandedIds((ids) => new Set(ids).add(material.id));
-              }}
-            >
-              <Plus aria-hidden="true" size={16} />
-            </button>
+            {view === "library" ? (
+              <button
+                className="material-disclosure material-add-child"
+                type="button"
+                aria-label={`Add child to ${material.title}`}
+                title={`Add child to ${material.title}`}
+                onClick={() => {
+                  setChildDrafts((drafts) =>
+                    material.id in drafts
+                      ? drafts
+                      : { ...drafts, [material.id]: "" },
+                  );
+                  setExpandedIds((ids) => new Set(ids).add(material.id));
+                }}
+              >
+                <Plus aria-hidden="true" size={16} />
+              </button>
+            ) : (
+              <span className="material-disclosure-spacer" />
+            )}
             {hasChildren ? (
               <button
                 className="material-disclosure"
@@ -447,21 +514,66 @@ export default function Home() {
               )}
             </div>
           </div>
-          <div className="material-actions">
-            <button
+          <details
+            className="material-actions-menu"
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) {
+                event.currentTarget.open = false;
+              }
+            }}
+          >
+            <summary
               className="button button-secondary"
-              type="button"
-              disabled={editingMetadataId !== null}
-              onClick={() => {
-                setEditingMetadataId(material.id);
-                setDraftMetadata(createMetadataDraft(material));
-                setMetadataErrorId(null);
-              }}
+              aria-label={`Actions for ${material.title}`}
             >
-              <Pencil aria-hidden="true" size={16} />
-              Edit details
-            </button>
-          </div>
+              Actions
+            </summary>
+            <div className="material-actions">
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={editingMetadataId !== null}
+                onClick={() => {
+                  setEditingMetadataId(material.id);
+                  setDraftMetadata(createMetadataDraft(material));
+                  setMetadataErrorId(null);
+                }}
+              >
+                <Pencil aria-hidden="true" size={16} />
+                Edit details
+              </button>
+              {isRoot && view === "library" && (
+                <archiveFetcher.Form method="post">
+                  <input type="hidden" name="intent" value="archive" />
+                  <input type="hidden" name="materialId" value={material.id} />
+                  <button
+                    className="button button-secondary"
+                    type="submit"
+                    title={`Archive ${material.title} and its descendants`}
+                    disabled={archiveFetcher.state !== "idle"}
+                  >
+                    <Archive aria-hidden="true" size={16} />
+                    Archive
+                  </button>
+                </archiveFetcher.Form>
+              )}
+              {isRoot && view === "archive" && (
+                <archiveFetcher.Form method="post">
+                  <input type="hidden" name="intent" value="restore" />
+                  <input type="hidden" name="materialId" value={material.id} />
+                  <button
+                    className="button button-secondary"
+                    type="submit"
+                    title={`Restore ${material.title} and its descendants`}
+                    disabled={archiveFetcher.state !== "idle"}
+                  >
+                    <RotateCcw aria-hidden="true" size={16} />
+                    Restore
+                  </button>
+                </archiveFetcher.Form>
+              )}
+            </div>
+          </details>
         </div>
         {hasChildren && (
           <ul
@@ -469,8 +581,8 @@ export default function Home() {
             id={`material-children-${material.id}`}
             hidden={!isExpanded}
           >
-            {material.children.map(renderMaterial)}
-            {material.id in childDrafts && (
+            {material.children.map((child) => renderMaterial(child, false))}
+            {view === "library" && material.id in childDrafts && (
               <li className="material-node">
                 <createFetcher.Form
                   method="post"
@@ -561,57 +673,106 @@ export default function Home() {
           </p>
         </header>
 
-        <section className="capture-section" aria-labelledby="capture-heading">
-          <h2 id="capture-heading">Add Material</h2>
-          <createFetcher.Form
-            method="post"
-            className="capture-form"
-            onSubmit={() => {
-              submittedCreate.current = { parentId: null, title: createTitle };
-            }}
+        {view === "library" && (
+          <section
+            className="capture-section"
+            aria-labelledby="capture-heading"
           >
-            <input type="hidden" name="intent" value="create" />
-            <label htmlFor="new-material-title">Title</label>
-            <div className="form-row">
-              <input
-                id="new-material-title"
-                name="title"
-                required
-                value={createTitle}
-                onChange={(event) => setCreateTitle(event.currentTarget.value)}
-                aria-describedby={
-                  createError ? "create-material-error" : undefined
-                }
-              />
-              <button
-                className="button button-primary"
-                type="submit"
-                disabled={!createTitle.trim() || createFetcher.state !== "idle"}
-              >
-                <Plus aria-hidden="true" size={16} />
-                {createFetcher.state === "submitting"
-                  ? "Adding…"
-                  : "Add Material"}
-              </button>
-            </div>
-            {createError && (
-              <p className="form-error" id="create-material-error" role="alert">
-                {createError}
-              </p>
-            )}
-          </createFetcher.Form>
-        </section>
+            <h2 id="capture-heading">Add Material</h2>
+            <createFetcher.Form
+              method="post"
+              className="capture-form"
+              onSubmit={() => {
+                submittedCreate.current = {
+                  parentId: null,
+                  title: createTitle,
+                };
+              }}
+            >
+              <input type="hidden" name="intent" value="create" />
+              <label htmlFor="new-material-title">Title</label>
+              <div className="form-row">
+                <input
+                  id="new-material-title"
+                  name="title"
+                  required
+                  value={createTitle}
+                  onChange={(event) =>
+                    setCreateTitle(event.currentTarget.value)
+                  }
+                  aria-describedby={
+                    createError ? "create-material-error" : undefined
+                  }
+                />
+                <button
+                  className="button button-primary"
+                  type="submit"
+                  disabled={
+                    !createTitle.trim() || createFetcher.state !== "idle"
+                  }
+                >
+                  <Plus aria-hidden="true" size={16} />
+                  {createFetcher.state === "submitting"
+                    ? "Adding…"
+                    : "Add Material"}
+                </button>
+              </div>
+              {createError && (
+                <p
+                  className="form-error"
+                  id="create-material-error"
+                  role="alert"
+                >
+                  {createError}
+                </p>
+              )}
+            </createFetcher.Form>
+          </section>
+        )}
 
         <section className="library-section" aria-labelledby="library-heading">
           <div className="section-heading">
-            <h2 id="library-heading">Your Library</h2>
+            <div className="library-heading">
+              <h2 id="library-heading">
+                {view === "library" ? "Your Library" : "Archived Material"}
+              </h2>
+              <nav className="library-views" aria-label="Material views">
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  aria-pressed={view === "library"}
+                  onClick={() => {
+                    setView("library");
+                    setSearchQuery("");
+                  }}
+                >
+                  Library
+                </button>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  aria-pressed={view === "archive"}
+                  onClick={() => {
+                    setView("archive");
+                    setSearchQuery("");
+                  }}
+                >
+                  Archived
+                </button>
+              </nav>
+            </div>
             <searchFetcher.Form
               method="post"
               role="search"
               className="library-search"
             >
               <input type="hidden" name="intent" value="search" />
-              <label htmlFor="library-search-query">Search titles</label>
+              <input type="hidden" name="scope" value={view} />
+              <label htmlFor="library-search-query">
+                {view === "library"
+                  ? "Search Library titles"
+                  : "Search archived titles"}
+              </label>
               <div className="library-search-controls">
                 <input
                   id="library-search-query"
@@ -651,6 +812,13 @@ export default function Home() {
               {currentSearch.message}
             </p>
           )}
+          {archiveFetcher.data?.intent ===
+            (view === "library" ? "archive" : "restore") &&
+            !archiveFetcher.data.ok && (
+              <p className="form-error" role="alert">
+                {archiveFetcher.data.message}
+              </p>
+            )}
           {searchResults ? (
             searchResults.length === 0 ? (
               <p className="empty-state" role="status">
@@ -680,13 +848,24 @@ export default function Home() {
                 ))}
               </ul>
             )
-          ) : materials.length === 0 ? (
-            <p className="empty-state">
-              No Materials yet. Add a title to start your Library.
-            </p>
+          ) : visibleMaterials.length === 0 ? (
+            view === "library" ? (
+              <p className="empty-state">
+                No Materials yet. Add a title to start your Library.
+              </p>
+            ) : (
+              <p className="empty-state">No archived Material.</p>
+            )
           ) : (
-            <ul className="material-list" aria-label="Library Materials">
-              {materials.map(renderMaterial)}
+            <ul
+              className="material-list"
+              aria-label={
+                view === "library" ? "Library Materials" : "Archived Material"
+              }
+            >
+              {visibleMaterials.map((material) =>
+                renderMaterial(material, true),
+              )}
             </ul>
           )}
         </section>

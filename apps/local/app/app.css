@@ -177,6 +177,24 @@ button:focus-visible {
   margin: 0;
 }
 
+.library-heading {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+}
+
+.library-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.library-views [aria-pressed="true"] {
+  border-color: var(--foreground);
+  color: var(--foreground);
+  background: var(--surface-hover);
+}
+
 .library-search {
   width: min(100%, 30rem);
   display: grid;
@@ -300,10 +318,17 @@ button:focus-visible {
   background: var(--border);
 }
 
-.material-actions {
-  display: flex;
+.material-actions-menu {
+  position: relative;
   flex: 0 0 auto;
-  gap: 0.5rem;
+}
+
+.material-actions-menu > summary {
+  list-style: none;
+}
+
+.material-actions-menu > summary::-webkit-details-marker {
+  display: none;
 }
 
 .material-actions .button-secondary {
@@ -318,6 +343,29 @@ button:focus-visible {
   border-color: var(--border);
   color: var(--foreground);
   background: var(--background);
+}
+
+.material-actions {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: calc(100% + 0.25rem);
+  inset-inline-end: 0;
+  min-width: 10rem;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.material-actions form {
+  display: grid;
+}
+
+.material-actions .button {
+  width: 100%;
+  justify-content: flex-start;
 }
 
 .material-title {
@@ -522,20 +570,20 @@ button:focus-visible {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .material-actions {
+  .material-actions-menu {
     opacity: 0;
     transition: opacity 120ms ease;
   }
 
-  .material-row:hover .material-actions,
-  .material-row:focus-within .material-actions {
+  .material-row:hover .material-actions-menu,
+  .material-row:focus-within .material-actions-menu {
     opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .material-row,
-  .material-actions {
+  .material-actions-menu {
     transition: none;
   }
 }
@@ -559,12 +607,6 @@ button:focus-visible {
     flex-wrap: wrap;
   }
 
-  .material-actions {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-
   .material-heading {
     flex-basis: 100%;
   }
@@ -574,11 +616,8 @@ button:focus-visible {
     padding-inline-start: 0.5rem;
   }
 
-  .material-actions {
-    gap: 0.25rem;
-    max-width: 100%;
-    flex-wrap: wrap;
-    margin-inline-start: 1.8rem;
+  .material-actions-menu {
+    margin-inline-start: auto;
   }
 
   .material-panel-header,

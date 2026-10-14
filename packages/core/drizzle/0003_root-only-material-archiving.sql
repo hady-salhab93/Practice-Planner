@@ -1,0 +1,2 @@
+ALTER TABLE "materials" ADD COLUMN "archived_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "materials" ADD CONSTRAINT "materials_archive_root_only" CHECK ("materials"."archived_at" is null or "materials"."parent_id" is null);

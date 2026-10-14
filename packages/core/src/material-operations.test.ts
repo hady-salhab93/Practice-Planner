@@ -6,11 +6,15 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  archiveMaterial,
   createChildMaterial,
   createStandaloneMaterial,
+  listArchivedMaterialTree,
   listLibraryMaterialTree,
   listLibraryMaterials,
   renameMaterial,
+  restoreMaterial,
+  searchArchivedMaterials,
   searchLibraryMaterials,
   updateMaterialMetadata,
 } from "./material-operations.js";
@@ -423,5 +427,129 @@ describe("Material operations", () => {
     ).rejects.toMatchObject({
       name: "InvalidMaterialTitleError",
     });
+  });
+
+  it("archives and restores only standalone Material with its entire subtree", async () => {
+    const precedingSibling = await createStandaloneMaterial(
+      database,
+      `Archive preceding sibling ${crypto.randomUUID()}`,
+    );
+    const root = await createStandaloneMaterial(
+      database,
+      `Archive root ${crypto.randomUUID()}`,
+    );
+    const followingSibling = await createStandaloneMaterial(
+      database,
+      `Archive following sibling ${crypto.randomUUID()}`,
+    );
+    const child = await createChildMaterial(
+      database,
+      root.id,
+      `Archive child ${crypto.randomUUID()}`,
+    );
+    const grandchild = await createChildMaterial(
+      database,
+      child.id,
+      `Archive grandchild ${crypto.randomUUID()}`,
+    );
+    const siblingIds = new Set([
+      precedingSibling.id,
+      root.id,
+      followingSibling.id,
+    ]);
+    const originalSiblingOrder = (await listLibraryMaterials(database))
+      .filter((material) => siblingIds.has(material.id))
+      .map((material) => material.id);
+
+    const archived = await archiveMaterial(database, root.id);
+    await updateMaterialMetadata(database, grandchild.id, {
+      description: "Edited while the root is archived",
+      references: [],
+    });
+    const archivedTree = await listArchivedMaterialTree(database);
+    const archivedSearch = await searchArchivedMaterials(
+      database,
+      grandchild.title,
+    );
+
+    expect(archived.archivedAt).toBeInstanceOf(Date);
+    expect(
+      (await listLibraryMaterialTree(database)).some(
+        (material) => material.id === root.id,
+      ),
+    ).toBe(false);
+    expect(
+      (await listLibraryMaterials(database)).some(
+        (material) => material.id === root.id,
+      ),
+    ).toBe(false);
+    await expect(
+      searchLibraryMaterials(database, grandchild.title),
+    ).resolves.toEqual([]);
+    expect(
+      archivedTree.find((material) => material.id === root.id),
+    ).toMatchObject({
+      id: root.id,
+      children: [
+        {
+          id: child.id,
+          children: [
+            {
+              id: grandchild.id,
+              description: "Edited while the root is archived",
+            },
+          ],
+        },
+      ],
+    });
+    expect(archivedSearch).toEqual([
+      {
+        id: grandchild.id,
+        title: grandchild.title,
+        ancestorPath: [
+          { id: root.id, title: root.title },
+          { id: child.id, title: child.title },
+        ],
+      },
+    ]);
+
+    await expect(archiveMaterial(database, child.id)).rejects.toMatchObject({
+      name: "MaterialArchiveRootOnlyError",
+    });
+    await expect(restoreMaterial(database, child.id)).rejects.toMatchObject({
+      name: "MaterialArchiveRootOnlyError",
+    });
+    await expect(
+      createChildMaterial(database, root.id, "Unavailable while archived"),
+    ).rejects.toMatchObject({ name: "ArchivedMaterialParentError" });
+
+    const restored = await restoreMaterial(database, root.id);
+    const restoredTree = await listLibraryMaterialTree(database);
+    const restoredRoot = restoredTree.find(
+      (material) => material.id === root.id,
+    );
+    const restoredChild = restoredRoot?.children.find(
+      (material) => material.id === child.id,
+    );
+    const restoredGrandchild = restoredChild?.children.find(
+      (material) => material.id === grandchild.id,
+    );
+    const restoredSiblingOrder = (await listLibraryMaterials(database))
+      .filter((material) => siblingIds.has(material.id))
+      .map((material) => material.id);
+
+    expect(restored.archivedAt).toBeNull();
+    expect(restoredSiblingOrder).toEqual(originalSiblingOrder);
+    expect(restoredGrandchild?.description).toBe(
+      "Edited while the root is archived",
+    );
+    expect(restoredChild?.children.map((material) => material.id)).toContain(
+      grandchild.id,
+    );
+    expect(
+      (await listArchivedMaterialTree(database)).some(
+        (material) => material.id === root.id,
+      ),
+    ).toBe(false);
   });
 });

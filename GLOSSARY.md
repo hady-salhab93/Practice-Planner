@@ -1,6 +1,6 @@
 # Practice Planner
 
-Language agreed during feature discovery for organizing guitar-practice material.
+Language agreed during feature discovery for organizing and classifying guitar-practice material.
 
 ## Language
 
@@ -11,3 +11,11 @@ _Avoid_: Practice Item
 **Library**:
 The collection of Material available for planning practice.
 _Avoid_: Backlog
+
+**Tag group**:
+A user-defined dimension for classifying Material, such as Kind, Focus, or Style.
+_Avoid_: Practice area
+
+**Tag**:
+A user-defined label within a Tag group, such as "Arpeggios" within Focus or "Blues" within Style.
+_Avoid_: Category
