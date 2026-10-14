@@ -27,6 +27,16 @@ saved sibling positions; do not reverse already persisted moves.
 workstreams. It is specified, not yet implemented. The previous sorting and
 moving issues remain deferred history rather than current-release blockers.
 
+## Discovery Update: 2026-10-14
+
+The user approved optional, user-defined Tag groups and Tags for classifying
+Material, filtering the Library and Sprint selection, and comparing practice
+time in Sprint reviews. They also replaced the prior ended-Sprint snapshot
+rule: past Sprint views use current Material names, hierarchy, and Tags.
+Recorded practice remains attached to its original Material and is never
+redistributed when the Library changes. These are product requirements, not
+claims of implementation or authorization to implement.
+
 ## User Stories
 
 1. As a guitarist, I want to capture material before fully analyzing it so that I can return to it later.
@@ -35,6 +45,7 @@ moving issues remain deferred history rather than current-release blockers.
 4. As a guitarist, I want to search my Library by title so that I can find what matters.
 5. As a guitarist, I want to browse my Library in manageable pages so that a growing collection remains usable without sorting or moving it.
 6. As a guitarist, I want to archive unused Material and delete mistakes so that the Library stays useful without losing practice history.
+7. As a guitarist, I want to classify Material along my own dimensions so that I can find, select, and compare practice in ways meaningful to me.
 
 ## Approved Behavior
 
@@ -74,16 +85,23 @@ moving issues remain deferred history rather than current-release blockers.
 - Normal Library browsing and title search exclude Material hidden by archiving.
 - Title search ignores capitalization and searches across the unarchived Library.
 - Results show ancestor paths to distinguish matching titles under different parents. Selecting a match opens it in context.
-- Provide an archived view with separate title search for archived Material, including descendants hidden by an archived ancestor.
+- Provide an archived view with separate title search for archived roots and their descendants, including ancestor context.
+
+### Classification
+
+- Users create, rename, and delete their own Tag groups and Tags. Examples include a "Kind" group with "Song" and "Exercise" Tags, a "Focus" group with "Arpeggios" and "Pentatonic", and a "Style" group with "Blues" and "Rock". No built-in taxonomy is required.
+- Classification is optional. A Material can have multiple Tags in a group, and Tags apply only to the Material they are assigned to; they are not inherited by descendants.
+- Use Tag groups to filter Library Material and help select Material for a Sprint. When multiple Tags are selected within one group, a Material matches any of those Tags; when filters are selected in multiple groups, a Material must match at least one Tag from each selected group.
+- Sprint reviews compare practice time within each Tag group. A Material assigned multiple Tags within a group contributes its full recorded time to each matching Tag. These label totals overlap and are not additive; distinguish them from the actual practice-time total.
+- Renaming or deleting a group or Tag updates current classification. Removing classification does not delete Material or practice records.
 
 ### Archiving And Restoration
 
-- Archiving Material hides it and its descendants from the normal Library without deleting them or their recorded history.
-- Restoring it makes the subtree visible again, except descendants that were independently archived before the ancestor was archived. Those remain archived.
-- Restore archived ancestors before restoring a child independently. Restoration does not silently move Material or restore ancestors on the user's behalf.
+- Only standalone/root Material can be archived or restored. Archiving a root hides it and its entire subtree from the normal Library without deleting them or their recorded history.
+- Descendants cannot be archived or restored independently. The root's archive state applies to its entire subtree; restoring the root makes all of its descendants visible again.
 - Preserve relative sibling positions through archiving and restoration.
 - Titles, descriptions, and links can be edited in the archived view. Eligible Material can also be deleted there.
-- Adding children requires restoration first. Material hidden by an archived ancestor is not available as an unarchived parent.
+- Adding children beneath an archived root requires restoring that root first. Material hidden as part of an archived subtree is not available as an unarchived parent.
 
 ### Permanent Deletion
 
@@ -96,9 +114,9 @@ moving issues remain deferred history rather than current-release blockers.
 ### Historical Integrity
 
 - Adding children never redistributes previously recorded practice. Earlier practice stays attached to its original Material.
-- Later Library renames or archiving do not rewrite an ended Sprint's historical names or grouping. Revisit move-related historical preservation if moving is approved in a future release.
+- Ended Sprint views use current Material names, hierarchy, and Tags after Library changes. Earlier practice remains attached to its original Material and is not redistributed to newly added children.
 - Preserve a connection from historical context to the current Material, including when it is archived.
-- These are preservation requirements, not a prescribed snapshot mechanism or a specification of the Sprint report UI.
+- These are current-state reporting requirements, not a prescribed mechanism or a specification of the Sprint report UI.
 
 ## Acceptance Scenarios
 
@@ -112,38 +130,42 @@ These scenarios are requirements for future verification, not claims of passing 
 6. Deferred: cycle and destination-conflict protection belong to any future approved move workflow.
 7. Browse standalone Material across pages with nested context intact, without sorting or moving controls. Page navigation survives reload and preserves the saved sibling sequence; archiving and restoring a sibling preserves its saved relative position.
 8. Search for "exercise" and find differently capitalized matching titles across the Library with ancestor context. Open a result in its hierarchy; archived matches appear only in the archived view's search.
-9. Archive one exercise independently, then archive and restore its book. The book and previously visible descendants return; the independently archived exercise stays archived.
-10. Attempt to restore a child beneath an archived ancestor or add children to archived Material; require ancestor restoration or Material restoration as applicable rather than silently reorganizing the Library.
+9. Archive a standalone book and verify that it and every nested chapter and exercise disappear from normal browsing and search, while their content, identity, and saved positions remain intact. Restore the book and verify its entire subtree returns.
+10. Attempt to archive or restore a nested chapter or add children beneath an archived root; reject the archive-state change for the nested Material and require root restoration before adding children.
 11. Rename archived Material and edit its description or links without restoring it; title uniqueness still applies.
 12. Delete an unused chapter after confirmation showing its descendant count; its subtree is removed. Cancel confirmation and retain everything unchanged.
 13. Attempt deletion when only a descendant has practice or a Sprint reference; block the whole deletion and offer archiving, preserving all records and references.
 14. Add passages beneath previously practiced Material; its earlier practice remains on that Material and is not assigned to the new passages.
-15. Rename or archive Material after a Sprint ends; the ended Sprint retains its names and grouping and remains connected to current Material. Move-related verification is deferred.
+15. Rename Material, change its Tags, or add children after a Sprint ends; the ended Sprint view reflects the current name, Tags, and hierarchy while earlier practice remains attached to the original Material. Move-related verification is deferred.
+16. Create user-defined Tag groups and Tags, leave Material unclassified or assign multiple Tags in one group, then filter Material with OR within a group and AND across selected groups.
+17. Record practice against Material with more than one Tag in a group; the Sprint review shows the full time under each matching Tag, marks those totals as overlapping, and keeps the actual practice-time total distinct.
 
 ## Exclusions
 
 - Completion, mastery, proficiency, and automatic practice-quality assessment.
-- Mandatory song/book/exercise types, fixed hierarchy levels, or shared Material with multiple parents.
+- Mandatory song/book/exercise types, fixed hierarchy levels or Tag taxonomies, or shared Material with multiple parents.
 - File uploads, embedded recordings or sheet music, and rich-text descriptions.
-- Tags, categories, automatic prioritization, all user-controlled sorting or ordering, moving, merging, and automatic conflict renaming.
-- Sprint selection, timing controls, and report presentation; these belong to their own feature interviews.
+- Goal-setting or tracking, metronome features, practice reminders, and schedules are deferred from the first version.
+- Automatic prioritization, all user-controlled sorting or ordering, moving, merging, and automatic conflict renaming.
+- Detailed Sprint selection rules, timer workflows, and report presentation; those belong to their own feature interviews. This PRD only establishes Tag-based filtering/selection and Tag-group comparisons.
 
 ## Dependencies And Open Questions
 
-The Library agreement is approved. The following cross-feature decisions remain open and block affected integration work, not basic capture and organization:
+The following cross-feature agreements are approved at discovery level. Their detailed interaction contracts belong in the owning feature PRDs and still block affected integration work, not basic capture and organization:
 
-- **Sprint planning and refinement:** what a Sprint references, whether selecting a parent includes descendants, and how adding children, archiving, or restoring Material affects planned or active commitments. Move effects are deferred with the move feature.
-- **Focused timing:** which Material is eligible for timing and what happens when its hierarchy or archive state changes while a timer is running.
-- **Sprint review:** the point at which historical names and grouping are retained, and how historical-to-current Material navigation is presented. Ended context must remain stable regardless of the chosen mechanism.
+- **Sprint planning and refinement:** Tag groups can filter and help select Material. What a Sprint references, whether selecting a parent includes descendants, and how adding children, archiving, or restoring Material affects planned or active commitments remain open. Move effects are deferred with the move feature.
+- **Focused timing:** V1 allows missed practice to be entered for any past date as one Material and a focused-time duration, then edited or deleted. Timer records count only unpaused time, continue while the app is backgrounded until explicitly paused or stopped, and can be edited or deleted. An unexpectedly interrupted timer returns unconfirmed for user confirmation or duration adjustment. Material eligibility, timer controls, and hierarchy/archive changes during a running timer remain open.
+- **Daily observations:** V1 allows one optional day-level summary per practice date across that day's practice; per-Material notes are not required. Detailed capture and editing behavior remains open.
+- **Sprint review:** compare practice time within each user-defined Tag group using current Material classification, names, and hierarchy, including for ended Sprints. Multiple-Tag totals overlap as specified above. Review layout, comparisons beyond these groups, and historical-to-current Material navigation remain open.
 - **Delivery:** unresolved database provisioning and durability choices remain in [stack planning](../STACK_PLANNING.md). This PRD does not silently settle them.
 
 Do not implement unresolved interactions by borrowing behavior from the deleted application-wide plan. Resolve them in the owning feature interview and link its approved PRD here before decomposing dependent integration tasks.
 
 ## Verification Expectations
 
-Follow [testing standards](../TESTING_STANDARDS.md) and [running checks](../agents/testing.md). Use focused behavior checks for hierarchy integrity, title conflicts, stable saved sibling sequence, pagination, archive/restoration state, and deletion eligibility. Verify persistence and protected relationships through integration checks, and exercise Save/Cancel, unsaved changes, page/search navigation, and destructive confirmation through user-facing checks. Sort and move behavior is excluded from current-release verification.
+Follow [testing standards](../TESTING_STANDARDS.md) and [running checks](../agents/testing.md). Use focused behavior checks for hierarchy integrity, title conflicts, stable saved sibling sequence, pagination, root-only archive/restoration of complete subtrees, and deletion eligibility. Verify persistence and protected relationships through integration checks, and exercise Save/Cancel, unsaved changes, page/search navigation, and destructive confirmation through user-facing checks. Sort and move behavior is excluded from current-release verification.
 
-Historical preservation scenarios require the later Sprint, timing, and review contracts; they cannot be declared verified by Library-only tests. Use [frontend standards](../FRONTEND_STANDARDS.md) for layout and controls without treating this document as a finalized screen design. Implementation issues and their acceptance criteria will be proposed separately after reviewing this PRD and its dependencies.
+Historical current-state reporting scenarios require the later Sprint, timing, and review contracts; they cannot be declared verified by Library-only tests. Use [frontend standards](../FRONTEND_STANDARDS.md) for layout and controls without treating this document as a finalized screen design. Implementation issues and their acceptance criteria will be proposed separately after reviewing this PRD and its dependencies.
 
 ## Implementation Backlog And Delivery Contract
 
@@ -178,9 +200,10 @@ required outcome.
   timing feature. Library actions must not silently start, stop, or retarget a
   timer.
 - Preserve earlier practice on its original Material when children are added.
-  Preserve ended-Sprint names/grouping and access to current Material, including
-  archived Material. Verify these against real timing and review contracts,
-  not invented copies or Library-only tests.
+  Ended Sprint views must reflect current Material names, hierarchy, and Tags,
+  while retaining access to the original Material, including archived
+  Material. Verify these against real timing and review contracts, not invented
+  copies or Library-only tests.
 
 Basic Library outcomes may precede later features. Once Sprints or timers are
 connected, resolve and verify the applicable gates before calling the integrated

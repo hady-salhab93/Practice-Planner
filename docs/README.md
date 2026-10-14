@@ -8,7 +8,7 @@
   sorting and moving are deferred. Pagination is not yet implemented.
 - [Material management implementation issues](https://github.com/hady-salhab93/Practice-Planner/issues/9): GitHub owns the implementation backlog; the feature PRD retains delivery and cross-feature gates.
 - [Application decision map](planning/map.md): agreed purpose and the route toward feature boundaries and a first useful version; not an implementation plan.
-- [Glossary](../GLOSSARY.md): agreed Material and Library terminology; feature PRDs own behavior.
+- [Glossary](../GLOSSARY.md): agreed Material, Library, and classification terminology; feature PRDs own behavior.
 
 ## Retained Architecture
 

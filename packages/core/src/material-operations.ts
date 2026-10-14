@@ -64,6 +64,20 @@ export class MaterialNotFoundError extends Error {
   }
 }
 
+export class MaterialArchiveRootOnlyError extends Error {
+  constructor() {
+    super("Only standalone Material can be archived or restored.");
+    this.name = "MaterialArchiveRootOnlyError";
+  }
+}
+
+export class ArchivedMaterialParentError extends Error {
+  constructor() {
+    super("Restore the standalone Material before adding children.");
+    this.name = "ArchivedMaterialParentError";
+  }
+}
+
 export async function createStandaloneMaterial(
   database: Database,
   title: string,
@@ -91,13 +105,7 @@ async function createMaterialInGroup(
       await transaction.execute(
         sql`select pg_advisory_xact_lock(1886218352, 0)`,
       );
-      if (parentId !== null) {
-        const [parent] = await transaction
-          .select({ id: materials.id })
-          .from(materials)
-          .where(eq(materials.id, parentId));
-        if (!parent) throw new MaterialNotFoundError();
-      }
+      if (parentId !== null) await ensureAvailableParent(transaction, parentId);
       const [lastPosition] = await transaction
         .select({ position: max(materials.position) })
         .from(materials)
@@ -130,12 +138,25 @@ export async function listLibraryMaterials(
   return database
     .select()
     .from(materials)
-    .where(isNull(materials.parentId))
+    .where(and(isNull(materials.parentId), isNull(materials.archivedAt)))
     .orderBy(asc(materials.position), asc(materials.id));
 }
 
 export async function listLibraryMaterialTree(
   database: Database,
+): Promise<MaterialTreeNode[]> {
+  return loadMaterialTree(database, false);
+}
+
+export async function listArchivedMaterialTree(
+  database: Database,
+): Promise<MaterialTreeNode[]> {
+  return loadMaterialTree(database, true);
+}
+
+async function loadMaterialTree(
+  database: Database,
+  archivedRoots: boolean,
 ): Promise<MaterialTreeNode[]> {
   const [rows, references] = await Promise.all([
     database
@@ -165,7 +186,7 @@ export async function listLibraryMaterialTree(
     if (!node) continue;
 
     if (material.parentId === null) {
-      roots.push(node);
+      if ((material.archivedAt !== null) === archivedRoots) roots.push(node);
       continue;
     }
 
@@ -179,6 +200,21 @@ export async function listLibraryMaterialTree(
 export async function searchLibraryMaterials(
   database: Database,
   query: string,
+): Promise<LibraryMaterialSearchResult[]> {
+  return searchMaterials(database, query, false);
+}
+
+export async function searchArchivedMaterials(
+  database: Database,
+  query: string,
+): Promise<LibraryMaterialSearchResult[]> {
+  return searchMaterials(database, query, true);
+}
+
+async function searchMaterials(
+  database: Database,
+  query: string,
+  archivedRoots: boolean,
 ): Promise<LibraryMaterialSearchResult[]> {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) return [];
@@ -200,7 +236,7 @@ export async function searchLibraryMaterials(
     if (!node) continue;
 
     if (material.parentId === null) {
-      roots.push(node);
+      if ((material.archivedAt !== null) === archivedRoots) roots.push(node);
       continue;
     }
 
@@ -223,6 +259,65 @@ export async function searchLibraryMaterials(
 
   for (const root of roots) visit(root, []);
   return results;
+}
+
+export async function archiveMaterial(
+  database: Database,
+  materialId: string,
+): Promise<Material> {
+  return updateRootArchiveState(database, materialId, true);
+}
+
+export async function restoreMaterial(
+  database: Database,
+  materialId: string,
+): Promise<Material> {
+  return updateRootArchiveState(database, materialId, false);
+}
+
+async function updateRootArchiveState(
+  database: Database,
+  materialId: string,
+  archived: boolean,
+): Promise<Material> {
+  return database.transaction(async (transaction) => {
+    await transaction.execute(sql`select pg_advisory_xact_lock(1886218352, 0)`);
+    const [existing] = await transaction
+      .select()
+      .from(materials)
+      .where(eq(materials.id, materialId));
+    if (!existing) throw new MaterialNotFoundError();
+    if (existing.parentId !== null) throw new MaterialArchiveRootOnlyError();
+    if ((existing.archivedAt !== null) === archived) return existing;
+
+    const [updated] = await transaction
+      .update(materials)
+      .set({ archivedAt: archived ? new Date() : null })
+      .where(eq(materials.id, materialId))
+      .returning();
+    if (!updated) throw new MaterialNotFoundError();
+    return updated;
+  });
+}
+
+async function ensureAvailableParent(
+  transaction: Parameters<Parameters<Database["transaction"]>[0]>[0],
+  parentId: string,
+): Promise<void> {
+  let ancestorId: string | null = parentId;
+  while (ancestorId !== null) {
+    const [ancestor] = await transaction
+      .select({
+        id: materials.id,
+        parentId: materials.parentId,
+        archivedAt: materials.archivedAt,
+      })
+      .from(materials)
+      .where(eq(materials.id, ancestorId));
+    if (!ancestor) throw new MaterialNotFoundError();
+    if (ancestor.archivedAt !== null) throw new ArchivedMaterialParentError();
+    ancestorId = ancestor.parentId;
+  }
 }
 
 export async function updateMaterialMetadata(

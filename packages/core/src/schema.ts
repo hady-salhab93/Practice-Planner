@@ -27,11 +27,16 @@ export const materials = pgTable(
       onDelete: "cascade",
     }),
     position: integer().notNull().default(0),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (table) => [
+    check(
+      "materials_archive_root_only",
+      sql`${table.archivedAt} is null or ${table.parentId} is null`,
+    ),
     check(
       "materials_title_not_blank",
       sql`length(btrim(${table.title}, ${titleEdgeWhitespace})) > 0`,
