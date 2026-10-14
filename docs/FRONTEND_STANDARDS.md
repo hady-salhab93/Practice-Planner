@@ -54,6 +54,7 @@ Adapt these interaction conventions from the reference's action-menu standards w
 5. Put destructive actions last with destructive styling. Confirm irreversible operations. Do not add actions that are absent from the specification.
 6. Hide inapplicable actions; disable temporarily unavailable ones and make the reason discoverable. Keep submenu depth to one level.
 7. Use one icon size and show shortcut hints only for implemented shortcuts. Copy Link is conditional on a future deep-link design, not a new approved feature.
+8. Close Actions menus when focus leaves the menu. Moving focus between the trigger and its actions must keep it open; returning to a row must not reopen a dismissed menu.
 
 ## Accessibility And Verification
 

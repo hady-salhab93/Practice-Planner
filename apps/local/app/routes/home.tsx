@@ -514,7 +514,14 @@ export default function Home() {
               )}
             </div>
           </div>
-          <details className="material-actions-menu">
+          <details
+            className="material-actions-menu"
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) {
+                event.currentTarget.open = false;
+              }
+            }}
+          >
             <summary
               className="button button-secondary"
               aria-label={`Actions for ${material.title}`}
