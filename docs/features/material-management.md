@@ -48,6 +48,8 @@ moving issues remain deferred history rather than current-release blockers.
 
 ### Titles And Editing
 
+- The home Library uses compact rows with an icon-only Add child button immediately before the expand/collapse chevron. Edit details includes the title, description, and references; there is no separate Rename control.
+- Saving Edit details persists all fields together. A failed save leaves all saved fields unchanged.
 - Titles are unique among siblings. All standalone Material shares the same title-uniqueness group.
 - Uniqueness includes archived Material and ignores capitalization and surrounding spaces. "Warm-up" and " warm-up " conflict within the same group.
 - The same title is allowed under different parents.

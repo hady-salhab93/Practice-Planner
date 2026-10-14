@@ -16,6 +16,12 @@ export type MaterialTreeNode = Material & {
   references: MaterialReference[];
 };
 
+export type LibraryMaterialSearchResult = {
+  id: string;
+  title: string;
+  ancestorPath: Array<{ id: string; title: string }>;
+};
+
 export type MaterialReferenceInput = {
   id?: string;
   label: string | null;
@@ -23,6 +29,7 @@ export type MaterialReferenceInput = {
 };
 
 export type MaterialMetadata = {
+  title?: string;
   description: string;
   references: MaterialReferenceInput[];
 };
@@ -169,11 +176,62 @@ export async function listLibraryMaterialTree(
   return roots;
 }
 
+export async function searchLibraryMaterials(
+  database: Database,
+  query: string,
+): Promise<LibraryMaterialSearchResult[]> {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [];
+
+  const rows = await database
+    .select()
+    .from(materials)
+    .orderBy(asc(materials.position), asc(materials.id));
+  type SearchNode = Material & { children: SearchNode[] };
+  const nodes = new Map<string, SearchNode>();
+  const roots: SearchNode[] = [];
+
+  for (const material of rows) {
+    nodes.set(material.id, { ...material, children: [] });
+  }
+
+  for (const material of rows) {
+    const node = nodes.get(material.id);
+    if (!node) continue;
+
+    if (material.parentId === null) {
+      roots.push(node);
+      continue;
+    }
+
+    const parent = nodes.get(material.parentId);
+    if (parent) parent.children.push(node);
+  }
+
+  const results: LibraryMaterialSearchResult[] = [];
+  function visit(
+    node: SearchNode,
+    ancestorPath: LibraryMaterialSearchResult["ancestorPath"],
+  ) {
+    if (node.title.toLowerCase().includes(normalizedQuery)) {
+      results.push({ id: node.id, title: node.title, ancestorPath });
+    }
+
+    const childPath = [...ancestorPath, { id: node.id, title: node.title }];
+    for (const child of node.children) visit(child, childPath);
+  }
+
+  for (const root of roots) visit(root, []);
+  return results;
+}
+
 export async function updateMaterialMetadata(
   database: Database,
   materialId: string,
   metadata: MaterialMetadata,
 ): Promise<Material & { references: MaterialReference[] }> {
+  const normalizedTitle =
+    metadata.title === undefined ? undefined : normalizeTitle(metadata.title);
   const normalizedReferences = metadata.references.map((reference) => ({
     ...reference,
     label: reference.label?.trim() || null,
@@ -188,77 +246,95 @@ export async function updateMaterialMetadata(
     );
   }
 
-  return database.transaction(async (transaction) => {
-    const [existingMaterial] = await transaction
-      .select()
-      .from(materials)
-      .where(eq(materials.id, materialId));
-    if (!existingMaterial) throw new MaterialNotFoundError();
+  return database
+    .transaction(async (transaction) => {
+      const [existingMaterial] = await transaction
+        .select()
+        .from(materials)
+        .where(eq(materials.id, materialId));
+      if (!existingMaterial) throw new MaterialNotFoundError();
 
-    const existingReferences = await transaction
-      .select()
-      .from(materialReferences)
-      .where(eq(materialReferences.materialId, materialId));
-    const existingIds = new Set(existingReferences.map(({ id }) => id));
-    if (referenceIds.some((id) => !existingIds.has(id))) {
-      throw new InvalidMaterialReferenceError(
-        "One of these references no longer belongs to this Material. Reload and try again.",
-      );
-    }
-
-    const [updatedMaterial] = await transaction
-      .update(materials)
-      .set({ description: metadata.description || null })
-      .where(eq(materials.id, materialId))
-      .returning();
-    if (!updatedMaterial) throw new MaterialNotFoundError();
-
-    const retainedIds = new Set(referenceIds);
-    const removedIds = existingReferences
-      .filter(({ id }) => !retainedIds.has(id))
-      .map(({ id }) => id);
-    if (removedIds.length > 0) {
-      await transaction
-        .delete(materialReferences)
-        .where(
-          and(
-            eq(materialReferences.materialId, materialId),
-            notInArray(materialReferences.id, referenceIds),
-          ),
+      const existingReferences = await transaction
+        .select()
+        .from(materialReferences)
+        .where(eq(materialReferences.materialId, materialId));
+      const existingIds = new Set(existingReferences.map(({ id }) => id));
+      if (referenceIds.some((id) => !existingIds.has(id))) {
+        throw new InvalidMaterialReferenceError(
+          "One of these references no longer belongs to this Material. Reload and try again.",
         );
-    }
+      }
 
-    for (const [position, reference] of normalizedReferences.entries()) {
-      const values = {
-        label: reference.label,
-        url: reference.url,
-        position,
-      };
-      if (reference.id) {
+      const [updatedMaterial] = await transaction
+        .update(materials)
+        .set({
+          ...(normalizedTitle === undefined ? {} : { title: normalizedTitle }),
+          description: metadata.description || null,
+        })
+        .where(eq(materials.id, materialId))
+        .returning();
+      if (!updatedMaterial) throw new MaterialNotFoundError();
+
+      const retainedIds = new Set(referenceIds);
+      const removedIds = existingReferences
+        .filter(({ id }) => !retainedIds.has(id))
+        .map(({ id }) => id);
+      if (removedIds.length > 0) {
         await transaction
-          .update(materialReferences)
-          .set(values)
+          .delete(materialReferences)
           .where(
             and(
-              eq(materialReferences.id, reference.id),
               eq(materialReferences.materialId, materialId),
+              notInArray(materialReferences.id, referenceIds),
             ),
           );
-      } else {
-        await transaction.insert(materialReferences).values({
-          ...values,
-          materialId,
-        });
       }
-    }
 
-    const savedReferences = await transaction
-      .select()
-      .from(materialReferences)
-      .where(eq(materialReferences.materialId, materialId))
-      .orderBy(asc(materialReferences.position), asc(materialReferences.id));
-    return { ...updatedMaterial, references: savedReferences };
-  });
+      for (const [position, reference] of normalizedReferences.entries()) {
+        const values = {
+          label: reference.label,
+          url: reference.url,
+          position,
+        };
+        if (reference.id) {
+          await transaction
+            .update(materialReferences)
+            .set(values)
+            .where(
+              and(
+                eq(materialReferences.id, reference.id),
+                eq(materialReferences.materialId, materialId),
+              ),
+            );
+        } else {
+          await transaction.insert(materialReferences).values({
+            ...values,
+            materialId,
+          });
+        }
+      }
+
+      const savedReferences = await transaction
+        .select()
+        .from(materialReferences)
+        .where(eq(materialReferences.materialId, materialId))
+        .orderBy(asc(materialReferences.position), asc(materialReferences.id));
+      return { ...updatedMaterial, references: savedReferences };
+    })
+    .catch(async (error: unknown) => {
+      if (normalizedTitle === undefined || !isTitleUniqueViolation(error))
+        throw error;
+      const [existing] = await database
+        .select({ parentId: materials.parentId })
+        .from(materials)
+        .where(eq(materials.id, materialId));
+      if (!existing) throw new MaterialNotFoundError();
+      throw await findTitleConflict(
+        database,
+        normalizedTitle,
+        existing.parentId,
+      );
+    });
 }
 
 function normalizeReferenceUrl(url: string): string {
