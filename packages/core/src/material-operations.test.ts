@@ -11,6 +11,7 @@ import {
   listLibraryMaterialTree,
   listLibraryMaterials,
   renameMaterial,
+  searchLibraryMaterials,
   updateMaterialMetadata,
 } from "./material-operations.js";
 import { materials } from "./schema.js";
@@ -134,6 +135,66 @@ describe("Material operations", () => {
     );
   });
 
+  it("searches persisted standalone and nested titles case-insensitively with ancestor paths", async () => {
+    const title = `Chromatic Exercise ${crypto.randomUUID()}`;
+    const firstBook = await createStandaloneMaterial(
+      database,
+      `Search book one ${crypto.randomUUID()}`,
+    );
+    const secondBook = await createStandaloneMaterial(
+      database,
+      `Search book two ${crypto.randomUUID()}`,
+    );
+    const firstChapter = await createChildMaterial(
+      database,
+      firstBook.id,
+      `Search chapter ${crypto.randomUUID()}`,
+    );
+    const firstExercise = await createChildMaterial(
+      database,
+      firstChapter.id,
+      title,
+    );
+    const secondExercise = await createChildMaterial(
+      database,
+      secondBook.id,
+      title,
+    );
+    const standalone = await createStandaloneMaterial(
+      database,
+      `Study ${title}`,
+    );
+
+    const results = await searchLibraryMaterials(database, title.toUpperCase());
+
+    expect(results).toHaveLength(3);
+    expect(results).toEqual(
+      expect.arrayContaining([
+        {
+          id: firstExercise.id,
+          title: firstExercise.title,
+          ancestorPath: [
+            { id: firstBook.id, title: firstBook.title },
+            { id: firstChapter.id, title: firstChapter.title },
+          ],
+        },
+        {
+          id: secondExercise.id,
+          title: secondExercise.title,
+          ancestorPath: [{ id: secondBook.id, title: secondBook.title }],
+        },
+        {
+          id: standalone.id,
+          title: standalone.title,
+          ancestorPath: [],
+        },
+      ]),
+    );
+    await expect(
+      searchLibraryMaterials(database, `unmatched-${crypto.randomUUID()}`),
+    ).resolves.toEqual([]);
+  });
+
   it("renames a standalone Material without changing its identity", async () => {
     const original = await createStandaloneMaterial(
       database,
@@ -208,6 +269,82 @@ describe("Material operations", () => {
         position: 1,
       },
     ]);
+  });
+
+  it("saves title, description, and references together without changing identity or parentage", async () => {
+    const parent = await createStandaloneMaterial(
+      database,
+      `Details parent ${crypto.randomUUID()}`,
+    );
+    const material = await createChildMaterial(database, parent.id, "Original");
+    const title = `Edited ${crypto.randomUUID()}`;
+
+    await updateMaterialMetadata(database, material.id, {
+      title: ` ${title} `,
+      description: "Updated description\nSecond line",
+      references: [{ label: "Tab", url: "https://example.com/tab" }],
+    });
+
+    const library = await listLibraryMaterialTree(database);
+    const saved = library
+      .find((entry) => entry.id === parent.id)
+      ?.children.find((entry) => entry.id === material.id);
+    expect(saved).toMatchObject({
+      id: material.id,
+      parentId: parent.id,
+      position: material.position,
+      title,
+      description: "Updated description\nSecond line",
+      references: [{ label: "Tab", url: "https://example.com/tab" }],
+    });
+  });
+
+  it("preserves all saved details when the edited title conflicts or a reference is invalid", async () => {
+    const parent = await createStandaloneMaterial(
+      database,
+      `Conflict parent ${crypto.randomUUID()}`,
+    );
+    const existing = await createChildMaterial(database, parent.id, "Existing");
+    const material = await createChildMaterial(database, parent.id, "Original");
+    const saved = await updateMaterialMetadata(database, material.id, {
+      description: "Saved description",
+      references: [
+        { label: "Original tab", url: "https://example.com/original" },
+      ],
+    });
+    const changedDetails = {
+      description: "Unsaved description",
+      references: [{ label: "New tab", url: "https://example.com/new" }],
+    };
+
+    await expect(
+      updateMaterialMetadata(database, material.id, {
+        ...changedDetails,
+        title: ` ${existing.title.toUpperCase()} `,
+      }),
+    ).rejects.toMatchObject({
+      name: "MaterialTitleConflictError",
+      conflictingMaterial: { id: existing.id, title: existing.title },
+    });
+    await expect(
+      updateMaterialMetadata(database, material.id, {
+        ...changedDetails,
+        title: " \t ",
+      }),
+    ).rejects.toMatchObject({ name: "InvalidMaterialTitleError" });
+    await expect(
+      updateMaterialMetadata(database, material.id, {
+        ...changedDetails,
+        title: "Changed title",
+        references: [{ label: null, url: "not a web address" }],
+      }),
+    ).rejects.toMatchObject({ name: "InvalidMaterialReferenceError" });
+
+    const library = await listLibraryMaterialTree(database);
+    const reloaded = library
+      .find((entry) => entry.id === parent.id)
+      ?.children.find((entry) => entry.id === material.id);
+    expect(reloaded).toMatchObject(saved);
   });
 
   it("rejects normalized duplicate titles and identifies the existing Material", async () => {

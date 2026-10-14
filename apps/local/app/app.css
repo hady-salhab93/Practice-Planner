@@ -29,7 +29,7 @@ body {
 }
 
 .library-page {
-  width: min(100% - 2rem, 56rem);
+  width: min(100% - 2rem, 80rem);
   margin-inline: auto;
   padding-block: 3rem 5rem;
 }
@@ -78,8 +78,7 @@ body {
   font-weight: 600;
 }
 
-.capture-form,
-.rename-form {
+.capture-form {
   display: grid;
   gap: 0.5rem;
 }
@@ -167,8 +166,68 @@ button:focus-visible {
 
 .section-heading {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.section-heading h2 {
+  margin: 0;
+}
+
+.library-search {
+  width: min(100%, 30rem);
+  display: grid;
+  gap: 0.4rem;
+}
+
+.library-search-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search-error {
+  margin-block: 0.5rem;
+}
+
+.search-results {
+  margin: 0 0 1rem;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.search-result {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem 0.5rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+}
+
+.search-result:hover {
+  background: var(--surface-hover);
+}
+
+.search-result-title {
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.search-result-path {
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
 }
 
 .material-list {
@@ -182,13 +241,18 @@ button:focus-visible {
   list-style: none;
 }
 
+.material-node:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
 .material-row {
-  min-height: 3rem;
+  min-height: 2.5rem;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.4rem 0.35rem;
+  gap: 0.5rem;
+  padding: 0.2rem 0.35rem;
   border-bottom: 1px solid var(--border);
   transition: background-color 120ms ease;
 }
@@ -201,7 +265,7 @@ button:focus-visible {
   min-width: 0;
   flex: 1;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.35rem;
 }
 
@@ -419,10 +483,6 @@ button:focus-visible {
   border-top: 1px solid var(--border);
 }
 
-.rename-form {
-  width: 100%;
-}
-
 .material-children {
   margin-inline-start: 0.35rem;
   padding-inline-start: 0.75rem;
@@ -519,10 +579,6 @@ button:focus-visible {
     max-width: 100%;
     flex-wrap: wrap;
     margin-inline-start: 1.8rem;
-  }
-
-  .rename-button {
-    flex: 0 0 auto;
   }
 
   .material-panel-header,

@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Pencil,
   Plus,
+  Search,
   X,
 } from "lucide-react";
 import {
@@ -23,7 +24,7 @@ import {
   listLibraryMaterialTree,
   MaterialNotFoundError,
   MaterialTitleConflictError,
-  renameMaterial,
+  searchLibraryMaterials,
   updateMaterialMetadata,
   type MaterialTreeNode,
 } from "@practice-planner/core/material-operations";
@@ -31,6 +32,7 @@ import { getDatabase } from "@practice-planner/core/db.server";
 import type { Route } from "./+types/home";
 
 type MaterialMetadataDraft = {
+  title: string;
   description: string;
   references: Array<{
     key: string;
@@ -51,6 +53,14 @@ export function shouldRevalidate({
   actionResult?: unknown;
   defaultShouldRevalidate: boolean;
 }) {
+  if (
+    typeof actionResult === "object" &&
+    actionResult !== null &&
+    "intent" in actionResult &&
+    actionResult.intent === "search"
+  ) {
+    return false;
+  }
   if (isFailedAction(actionResult)) return false;
   return defaultShouldRevalidate;
 }
@@ -60,12 +70,12 @@ export async function action({ request }: Route.ActionArgs) {
   const intent = formData.get("intent");
   const rawTitle = formData.get("title");
   const submittedTitle = typeof rawTitle === "string" ? rawTitle : "";
-  const database = getDatabase();
 
   if (intent === "create") {
     const rawParentId = formData.get("parentId");
     const parentId = typeof rawParentId === "string" ? rawParentId : null;
     try {
+      const database = getDatabase();
       const material =
         parentId === null
           ? await createStandaloneMaterial(database, submittedTitle)
@@ -88,32 +98,28 @@ export async function action({ request }: Route.ActionArgs) {
     }
   }
 
-  if (intent === "rename") {
-    const materialId = formData.get("materialId");
-    if (typeof materialId !== "string") {
+  if (intent === "search") {
+    const rawQuery = formData.get("query");
+    const query = typeof rawQuery === "string" ? rawQuery.trim() : "";
+    if (!query) {
       return {
         ok: false,
         intent,
-        materialId: "",
-        message: "Select a Material to rename.",
-        submittedTitle,
+        query,
+        message: "Enter a title to search the Library.",
       };
     }
 
     try {
-      const material = await renameMaterial(
-        database,
-        materialId,
-        submittedTitle,
-      );
-      return { ok: true, intent, materialId: material.id, submittedTitle };
-    } catch (error) {
+      const results = await searchLibraryMaterials(getDatabase(), query);
+      return { ok: true, intent, query, results };
+    } catch {
       return {
         ok: false,
         intent,
-        materialId,
-        message: getActionErrorMessage(error),
-        submittedTitle,
+        query,
+        message:
+          "Could not search the Library. Your search is still here; try again.",
       };
     }
   }
@@ -150,7 +156,8 @@ export async function action({ request }: Route.ActionArgs) {
       };
     });
     try {
-      await updateMaterialMetadata(database, materialId, {
+      await updateMaterialMetadata(getDatabase(), materialId, {
+        title: submittedTitle,
         description: typeof rawDescription === "string" ? rawDescription : "",
         references,
       });
@@ -196,28 +203,37 @@ function isFailedAction(result: unknown): result is { ok: false } {
 export default function Home() {
   const { materials } = useLoaderData<typeof loader>();
   const createFetcher = useFetcher<typeof action>();
-  const renameFetcher = useFetcher<typeof action>();
+  const searchFetcher = useFetcher<typeof action>();
   const metadataFetcher = useFetcher<typeof action>();
   const [createTitle, setCreateTitle] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [childDrafts, setChildDrafts] = useState<Record<string, string>>({});
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftTitle, setDraftTitle] = useState("");
   const [editingMetadataId, setEditingMetadataId] = useState<string | null>(
     null,
   );
   const [draftMetadata, setDraftMetadata] =
     useState<MaterialMetadataDraft | null>(null);
   const [metadataErrorId, setMetadataErrorId] = useState<string | null>(null);
+  const pendingMaterialFocusId = useRef<string | null>(null);
   const metadataPanelRef = useRef<HTMLDialogElement>(null);
   const submittedCreate = useRef<{
     parentId: string | null;
     title: string;
   } | null>(null);
-  const submittedRenameTitle = useRef<string | null>(null);
   const submittedMetadataId = useRef<string | null>(null);
-  const editingMaterial = findMaterial(materials, editingId);
   const editingMetadataMaterial = findMaterial(materials, editingMetadataId);
+  const currentSearch =
+    searchFetcher.data?.intent === "search" &&
+    searchFetcher.data.query === searchQuery.trim()
+      ? searchFetcher.data
+      : undefined;
+  const searchResults =
+    currentSearch?.intent === "search" &&
+    currentSearch.ok &&
+    "results" in currentSearch
+      ? currentSearch.results
+      : undefined;
   const metadataIsDirty =
     editingMetadataMaterial !== undefined &&
     draftMetadata !== null &&
@@ -225,7 +241,6 @@ export default function Home() {
   const isDirty =
     createTitle.length > 0 ||
     Object.values(childDrafts).some((title) => title.length > 0) ||
-    (editingMaterial !== undefined && draftTitle !== editingMaterial.title) ||
     metadataIsDirty;
   const blocker = useBlocker(isDirty);
 
@@ -260,25 +275,6 @@ export default function Home() {
     }
     submittedCreate.current = null;
   }, [childDrafts, createFetcher.data, createFetcher.state, createTitle]);
-
-  useEffect(() => {
-    if (
-      renameFetcher.state !== "idle" ||
-      renameFetcher.data?.intent !== "rename"
-    )
-      return;
-    const submittedTitle = submittedRenameTitle.current;
-    if (submittedTitle === null) return;
-    if (
-      renameFetcher.data.ok &&
-      renameFetcher.data.materialId === editingId &&
-      draftTitle === submittedTitle
-    ) {
-      setEditingId(null);
-      setDraftTitle("");
-    }
-    submittedRenameTitle.current = null;
-  }, [draftTitle, editingId, renameFetcher.data, renameFetcher.state]);
 
   useEffect(() => {
     if (
@@ -317,6 +313,16 @@ export default function Home() {
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
   }, [isDirty]);
 
+  useEffect(() => {
+    const materialId = pendingMaterialFocusId.current;
+    if (materialId === null) return;
+    const element = document.getElementById(`material-${materialId}`);
+    if (!element) return;
+    element.focus({ preventScroll: true });
+    element.scrollIntoView({ block: "nearest" });
+    pendingMaterialFocusId.current = null;
+  }, [expandedIds, searchQuery]);
+
   const createError =
     createFetcher.data?.intent === "create" &&
     !createFetcher.data.ok &&
@@ -346,8 +352,20 @@ export default function Home() {
     discardMetadataDraft();
   }
 
+  function openMaterialInContext(result: {
+    id: string;
+    ancestorPath: Array<{ id: string; title: string }>;
+  }) {
+    pendingMaterialFocusId.current = result.id;
+    setExpandedIds((ids) => {
+      const nextIds = new Set(ids);
+      for (const ancestor of result.ancestorPath) nextIds.add(ancestor.id);
+      return nextIds;
+    });
+    setSearchQuery("");
+  }
+
   function renderMaterial(material: MaterialTreeNode) {
-    const isEditing = editingId === material.id;
     const childTitle = childDrafts[material.id] ?? "";
     const childError =
       createFetcher.data?.intent === "create" &&
@@ -356,174 +374,94 @@ export default function Home() {
       createFetcher.data.submittedTitle === childTitle
         ? createFetcher.data.message
         : undefined;
-    const renameError =
-      renameFetcher.data?.intent === "rename" &&
-      renameFetcher.data.materialId === material.id &&
-      renameFetcher.data.submittedTitle === draftTitle &&
-      !renameFetcher.data.ok
-        ? renameFetcher.data.message
-        : undefined;
     const hasChildren =
       material.children.length > 0 || material.id in childDrafts;
     const isExpanded = expandedIds.has(material.id);
 
     return (
-      <li className="material-node" key={material.id}>
+      <li
+        className="material-node"
+        id={`material-${material.id}`}
+        key={material.id}
+        tabIndex={-1}
+      >
         <div className="material-row">
-          {isEditing ? (
-            <renameFetcher.Form
-              method="post"
-              className="rename-form"
-              onSubmit={() => {
-                submittedRenameTitle.current = draftTitle;
+          <div className="material-heading">
+            <button
+              className="material-disclosure material-add-child"
+              type="button"
+              aria-label={`Add child to ${material.title}`}
+              title={`Add child to ${material.title}`}
+              onClick={() => {
+                setChildDrafts((drafts) =>
+                  material.id in drafts
+                    ? drafts
+                    : { ...drafts, [material.id]: "" },
+                );
+                setExpandedIds((ids) => new Set(ids).add(material.id));
               }}
             >
-              <input type="hidden" name="intent" value="rename" />
-              <input type="hidden" name="materialId" value={material.id} />
-              <label htmlFor={`rename-material-${material.id}`}>Title</label>
-              <div className="form-row">
-                <input
-                  id={`rename-material-${material.id}`}
-                  name="title"
-                  required
-                  value={draftTitle}
-                  onChange={(event) => setDraftTitle(event.currentTarget.value)}
-                  aria-describedby={
-                    renameError ? `rename-error-${material.id}` : undefined
-                  }
-                />
-                <button
-                  className="button button-primary"
-                  type="submit"
-                  disabled={
-                    !draftTitle.trim() ||
-                    draftTitle === material.title ||
-                    renameFetcher.state !== "idle"
-                  }
-                >
-                  <Check aria-hidden="true" size={16} />
-                  {renameFetcher.state === "submitting" ? "Saving…" : "Save"}
-                </button>
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  disabled={renameFetcher.state !== "idle"}
-                  onClick={() => {
-                    setEditingId(null);
-                    setDraftTitle("");
-                  }}
-                >
-                  <X aria-hidden="true" size={16} />
-                  Cancel
-                </button>
-              </div>
-              {renameError && (
-                <p
-                  className="form-error"
-                  id={`rename-error-${material.id}`}
-                  role="alert"
-                >
-                  {renameError}
-                </p>
-              )}
-            </renameFetcher.Form>
-          ) : (
-            <>
-              <div className="material-heading">
-                {hasChildren ? (
-                  <button
-                    className="material-disclosure"
-                    type="button"
-                    aria-label={`${isExpanded ? "Collapse" : "Expand"} ${material.title}`}
-                    aria-expanded={isExpanded}
-                    aria-controls={`material-children-${material.id}`}
-                    onClick={() =>
-                      setExpandedIds((ids) => {
-                        const nextIds = new Set(ids);
-                        if (isExpanded) nextIds.delete(material.id);
-                        else nextIds.add(material.id);
-                        return nextIds;
-                      })
-                    }
-                  >
-                    {isExpanded ? (
-                      <ChevronDown aria-hidden="true" size={16} />
-                    ) : (
-                      <ChevronRight aria-hidden="true" size={16} />
-                    )}
-                  </button>
+              <Plus aria-hidden="true" size={16} />
+            </button>
+            {hasChildren ? (
+              <button
+                className="material-disclosure"
+                type="button"
+                aria-label={`${isExpanded ? "Collapse" : "Expand"} ${material.title}`}
+                aria-expanded={isExpanded}
+                aria-controls={`material-children-${material.id}`}
+                onClick={() =>
+                  setExpandedIds((ids) => {
+                    const nextIds = new Set(ids);
+                    if (isExpanded) nextIds.delete(material.id);
+                    else nextIds.add(material.id);
+                    return nextIds;
+                  })
+                }
+              >
+                {isExpanded ? (
+                  <ChevronDown aria-hidden="true" size={16} />
                 ) : (
-                  <span className="material-disclosure-spacer" />
+                  <ChevronRight aria-hidden="true" size={16} />
                 )}
-                <div className="material-copy">
-                  <h3 className="material-title">{material.title}</h3>
-                  {material.description && (
-                    <p className="material-description">
-                      {material.description}
-                    </p>
-                  )}
-                  {material.references.length > 0 && (
-                    <ul
-                      className="material-references"
-                      aria-label={`References for ${material.title}`}
-                    >
-                      {material.references.map((reference) => (
-                        <li key={reference.id}>
-                          <ExternalLink aria-hidden="true" size={14} />
-                          <a href={reference.url}>
-                            {reference.label || reference.url}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-              <div className="material-actions">
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  onClick={() => {
-                    setChildDrafts((drafts) =>
-                      material.id in drafts
-                        ? drafts
-                        : { ...drafts, [material.id]: "" },
-                    );
-                    setExpandedIds((ids) => new Set(ids).add(material.id));
-                  }}
+              </button>
+            ) : (
+              <span className="material-disclosure-spacer" />
+            )}
+            <div className="material-copy">
+              <h3 className="material-title">{material.title}</h3>
+              {material.references.length > 0 && (
+                <ul
+                  className="material-references"
+                  aria-label={`References for ${material.title}`}
                 >
-                  <Plus aria-hidden="true" size={16} />
-                  Add child
-                </button>
-                <button
-                  className="button button-secondary rename-button"
-                  type="button"
-                  onClick={() => {
-                    setEditingId(material.id);
-                    setDraftTitle(material.title);
-                  }}
-                  disabled={editingMetadataId !== null}
-                  aria-label={`Rename ${material.title}`}
-                >
-                  <Pencil aria-hidden="true" size={16} />
-                  Rename
-                </button>
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  disabled={editingId !== null || editingMetadataId !== null}
-                  onClick={() => {
-                    setEditingMetadataId(material.id);
-                    setDraftMetadata(createMetadataDraft(material));
-                    setMetadataErrorId(null);
-                  }}
-                >
-                  <Pencil aria-hidden="true" size={16} />
-                  Edit details
-                </button>
-              </div>
-            </>
-          )}
+                  {material.references.map((reference) => (
+                    <li key={reference.id}>
+                      <ExternalLink aria-hidden="true" size={14} />
+                      <a href={reference.url}>
+                        {reference.label || reference.url}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          <div className="material-actions">
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={editingMetadataId !== null}
+              onClick={() => {
+                setEditingMetadataId(material.id);
+                setDraftMetadata(createMetadataDraft(material));
+                setMetadataErrorId(null);
+              }}
+            >
+              <Pencil aria-hidden="true" size={16} />
+              Edit details
+            </button>
+          </div>
         </div>
         {hasChildren && (
           <ul
@@ -667,8 +605,82 @@ export default function Home() {
         <section className="library-section" aria-labelledby="library-heading">
           <div className="section-heading">
             <h2 id="library-heading">Your Library</h2>
+            <searchFetcher.Form
+              method="post"
+              role="search"
+              className="library-search"
+            >
+              <input type="hidden" name="intent" value="search" />
+              <label htmlFor="library-search-query">Search titles</label>
+              <div className="library-search-controls">
+                <input
+                  id="library-search-query"
+                  name="query"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) =>
+                    setSearchQuery(event.currentTarget.value)
+                  }
+                  aria-describedby={
+                    currentSearch?.intent === "search" && !currentSearch.ok
+                      ? "library-search-error"
+                      : undefined
+                  }
+                />
+                <button
+                  className="button button-secondary"
+                  type="submit"
+                  disabled={
+                    !searchQuery.trim() || searchFetcher.state !== "idle"
+                  }
+                >
+                  <Search aria-hidden="true" size={16} />
+                  {searchFetcher.state === "submitting"
+                    ? "Searching…"
+                    : "Search"}
+                </button>
+              </div>
+            </searchFetcher.Form>
           </div>
-          {materials.length === 0 ? (
+          {currentSearch?.intent === "search" && !currentSearch.ok && (
+            <p
+              className="form-error search-error"
+              id="library-search-error"
+              role="alert"
+            >
+              {currentSearch.message}
+            </p>
+          )}
+          {searchResults ? (
+            searchResults.length === 0 ? (
+              <p className="empty-state" role="status">
+                No Material titles found for “{searchQuery.trim()}”.
+              </p>
+            ) : (
+              <ul className="search-results" aria-label="Search results">
+                {searchResults.map((result) => (
+                  <li key={result.id}>
+                    <button
+                      className="search-result"
+                      type="button"
+                      onClick={() => openMaterialInContext(result)}
+                    >
+                      <span className="search-result-title">
+                        {result.title}
+                      </span>
+                      <span className="search-result-path">
+                        {result.ancestorPath.length > 0
+                          ? result.ancestorPath
+                              .map((ancestor) => ancestor.title)
+                              .join(" › ")
+                          : "Library"}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : materials.length === 0 ? (
             <p className="empty-state">
               No Materials yet. Add a title to start your Library.
             </p>
@@ -730,6 +742,23 @@ export default function Home() {
               value={editingMetadataMaterial.id}
             />
             <div className="material-panel-content">
+              <label htmlFor="material-panel-title-input">Title</label>
+              <input
+                id="material-panel-title-input"
+                name="title"
+                required
+                value={draftMetadata.title}
+                onChange={(event) => {
+                  const title = event.currentTarget.value;
+                  setDraftMetadata((draft) =>
+                    draft ? { ...draft, title } : draft,
+                  );
+                }}
+                disabled={metadataFetcher.state !== "idle"}
+                aria-describedby={
+                  metadataError ? "material-panel-error" : undefined
+                }
+              />
               <label htmlFor="material-panel-description">Description</label>
               <textarea
                 id="material-panel-description"
@@ -838,7 +867,11 @@ export default function Home() {
                 </button>
               </fieldset>
               {metadataError && (
-                <p className="form-error" role="alert">
+                <p
+                  className="form-error"
+                  id="material-panel-error"
+                  role="alert"
+                >
                   {metadataError}
                 </p>
               )}
@@ -855,7 +888,11 @@ export default function Home() {
               <button
                 className="button button-primary"
                 type="submit"
-                disabled={!metadataIsDirty || metadataFetcher.state !== "idle"}
+                disabled={
+                  !draftMetadata.title.trim() ||
+                  !metadataIsDirty ||
+                  metadataFetcher.state !== "idle"
+                }
               >
                 <Check aria-hidden="true" size={16} />
                 {metadataFetcher.state === "submitting" ? "Saving…" : "Save"}
@@ -894,6 +931,7 @@ function createMetadataDraft(
   material: MaterialTreeNode,
 ): MaterialMetadataDraft {
   return {
+    title: material.title,
     description: material.description ?? "",
     references: material.references.map((reference) => ({
       key: reference.id,
@@ -909,6 +947,7 @@ function hasMetadataChanges(
   draft: MaterialMetadataDraft,
 ): boolean {
   return (
+    draft.title !== material.title ||
     draft.description !== (material.description ?? "") ||
     draft.references.length !== material.references.length ||
     draft.references.some((reference, index) => {
