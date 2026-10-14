@@ -8,7 +8,16 @@ Each slice delivers a usable workflow through the UI in `apps/local`, React Rout
 
 All slices follow the [glossary](../../../GLOSSARY.md), [frontend standards](../../FRONTEND_STANDARDS.md), [testing standards](../../TESTING_STANDARDS.md), and [running checks](../../agents/testing.md). Verify user-visible success and failure paths, persistence after reload, and relevant integrity risks. An unchecked criterion describes future work, not passing verification.
 
-`planned` means an approved slice that is not implemented or automatically ready to start. `blocked` additionally identifies unresolved contracts beyond preceding slices. `complete` means the slice's acceptance criteria have been verified. Read each issue's dependencies and this index before starting. Dependency lists describe required outcomes; a preceding file's existence does not satisfy them.
+`planned` means an approved slice that is not implemented or automatically ready to start. `blocked` additionally identifies unresolved contracts beyond preceding slices. `complete` means the slice's acceptance criteria have been verified. `deferred` means excluded from the current release pending future discovery; its historical criteria are not implementation authorization. Read each issue's dependencies and this index before starting. Dependency lists describe required outcomes; a preceding file's existence does not satisfy them.
+
+## Release Scope Update: 2026-10-14
+
+Sorting and moving are deferred at the author's request. Title sorting was
+previously implemented, but its capability is removed from this release along
+with the in-progress move implementation. Preserve Material data and saved
+sibling positions. The [Library pagination spec](../../features/library-pagination.md)
+replaces these workstreams; pagination is specified, not yet delivered. Keep the
+old issue identifiers as historical/future references, not release blockers.
 
 ## Slices
 
@@ -17,11 +26,12 @@ All slices follow the [glossary](../../../GLOSSARY.md), [frontend standards](../
 | 1     | [Capture and rename standalone Material](01-capture-and-rename.md)           | [#1](https://github.com/hady-salheb93/Practice-Planner/issues/1) | Local Docker Compose PostgreSQL, persistent named volume | Complete |
 | 2     | [Break Material into nested pieces](02-break-down-material.md)               | [#2](https://github.com/hady-salhab93/Practice-Planner/issues/2) | Slice 1                                                  | Complete |
 | 3     | [Describe Material and manage references](03-descriptions-and-references.md) | [#3](https://github.com/hady-salhab93/Practice-Planner/issues/3) | Slice 1                                                  | Complete |
-| 4     | [Sort Material by title](04-reorder-material.md)                              | [#4](https://github.com/hady-salhab93/Practice-Planner/issues/4) | Slice 2                                                  | Planned  |
-| 5     | [Move Material with its descendants](05-move-material.md)                    | [#5](https://github.com/hady-salhab93/Practice-Planner/issues/5) | Slices 2 and 4                                           | Planned  |
+| 4     | [Sort Material by title](04-reorder-material.md)                              | [#4](https://github.com/hady-salhab93/Practice-Planner/issues/4) | Future discovery                                        | Deferred |
+| 5     | [Move Material with its descendants](05-move-material.md)                    | [#5](https://github.com/hady-salhab93/Practice-Planner/issues/5) | Future discovery                                        | Deferred |
 | 6     | [Find Material in context](06-find-material.md)                              | [#6](https://github.com/hady-salhab93/Practice-Planner/issues/6) | Slice 2                                                  | Planned  |
-| 7     | [Archive and restore Material](07-archive-and-restore.md)                    | [#7](https://github.com/hady-salhab93/Practice-Planner/issues/7) | Slices 3, 4, 5, and 6, transitively Slice 2              | Planned  |
+| 7     | [Archive and restore Material](07-archive-and-restore.md)                    | [#7](https://github.com/hady-salhab93/Practice-Planner/issues/7) | Slices 3 and 6, transitively Slice 2                    | Planned  |
 | 8     | [Delete unused Material safely](08-delete-unused-material.md)                | [#8](https://github.com/hady-salhab93/Practice-Planner/issues/8) | Slice 7 and real Sprint/practice-reference contracts     | Blocked  |
+| Replacement | [Library pagination](../../features/library-pagination.md)             | Publication pending                                       | Slices 1 and 2                                          | Specified |
 
 ## Cross-Feature Gates
 
@@ -41,9 +51,9 @@ Basic Library outcomes can be implemented before those later features exist. Onc
 | 2                       | Slice 3                                                                  |
 | 3                       | Slices 1, 2, and 3; archived editing in Slice 7                          |
 | 4                       | Slices 1 and 2; archived conflicts in Slice 7                            |
-| 5                       | Slice 5; attached-practice preservation at the historical-integrity gate |
-| 6                       | Slice 5                                                                  |
-| 7                       | Slices 2, 4, 5, and 7                                                    |
+| 5                       | Deferred move work; not current-release acceptance                       |
+| 6                       | Deferred move work; not current-release acceptance                       |
+| 7                       | Pagination replacement, Slice 2, and saved-sequence preservation in Slice 7 |
 | 8                       | Slice 6; archived filtering/search in Slice 7                            |
 | 9, 10, 11               | Slice 7                                                                  |
 | 12, 13                  | Slice 8                                                                  |

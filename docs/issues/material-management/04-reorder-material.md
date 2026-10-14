@@ -1,6 +1,6 @@
 ---
 name: Sort Material by title
-status: planned
+status: deferred
 blocked_by: [02-break-down-material.md]
 ---
 
@@ -11,6 +11,17 @@ blocked_by: [02-break-down-material.md]
 The guitarist can sort standalone Material and children within a parent by title.
 
 Source: [approved PRD](../../features/material-management.md). Apply the shared [delivery contract and gates](README.md).
+
+## Release Decision
+
+Deferred on 2026-10-14. The author does not need user-controlled ordering in this
+release and wants to reconsider the behavior before implementing it again.
+Title sorting was previously delivered by PR #12; its historical closed issue
+does not mean the capability remains in the current release. Remove its controls
+and implementation without deleting saved sibling positions or Material data.
+The [Library pagination spec](../../features/library-pagination.md) replaces this
+release workstream. The criteria below are historical discovery input, not
+current implementation authorization.
 
 ## Dependencies
 

@@ -46,6 +46,8 @@ The Library supports adding and renaming standalone Material. Other product work
 
 The selected architecture is a pnpm/Turbo workspace with a React Router full-stack app in `apps/local` and server-side domain/database code in `packages/core`. React Router loaders and actions call domain operations; PostgreSQL credentials remain server-side. Database placement remains open.
 
+See the [code structure guide](docs/agents/code-structure.md) for how the current app routes, core package, and database fit together.
+
 Accepted decisions guide implementation:
 
 - [React Router full-stack application with PostgreSQL](docs/adr/0004-react-router-fullstack-postgresql.md).

@@ -1,6 +1,6 @@
 ---
 name: Move Material with its descendants
-status: planned
+status: deferred
 blocked_by: [02-break-down-material.md, 04-reorder-material.md]
 ---
 
@@ -11,6 +11,16 @@ blocked_by: [02-break-down-material.md, 04-reorder-material.md]
 The guitarist can reorganize existing Material without duplicating or rebuilding its breakdown.
 
 Source: [approved PRD](../../features/material-management.md). Apply the shared [delivery contract and gates](README.md).
+
+## Release Decision
+
+Deferred on 2026-10-14. Moving Material is not needed for this release; the author
+wants to think through the intended behavior before approving future work.
+Remove the in-progress move operation and UI without changing existing Material
+identity, parentage, metadata, or saved sibling positions. Do not undo moves that
+were already persisted. The [Library pagination spec](../../features/library-pagination.md)
+replaces this release workstream. The criteria below are historical discovery
+input, not current implementation authorization.
 
 ## Dependencies
 

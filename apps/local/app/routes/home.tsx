@@ -5,12 +5,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import {
-  useBlocker,
-  useFetcher,
-  useLoaderData,
-  useSearchParams,
-} from "react-router";
+import { useBlocker, useFetcher, useLoaderData } from "react-router";
 import {
   Check,
   ChevronDown,
@@ -29,7 +24,6 @@ import {
   MaterialNotFoundError,
   MaterialTitleConflictError,
   renameMaterial,
-  sortMaterialTreeByTitle,
   updateMaterialMetadata,
   type MaterialTreeNode,
 } from "@practice-planner/core/material-operations";
@@ -201,12 +195,9 @@ function isFailedAction(result: unknown): result is { ok: false } {
 
 export default function Home() {
   const { materials } = useLoaderData<typeof loader>();
-  const [searchParams, setSearchParams] = useSearchParams();
   const createFetcher = useFetcher<typeof action>();
   const renameFetcher = useFetcher<typeof action>();
   const metadataFetcher = useFetcher<typeof action>();
-  const sortDirection = searchParams.get("sort") === "desc" ? "desc" : "asc";
-  const sortedMaterials = sortMaterialTreeByTitle(materials, sortDirection);
   const [createTitle, setCreateTitle] = useState("");
   const [childDrafts, setChildDrafts] = useState<Record<string, string>>({});
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
@@ -353,13 +344,6 @@ export default function Home() {
     if (metadataFetcher.state !== "idle") return;
     if (metadataIsDirty && !window.confirm("Discard unsaved changes?")) return;
     discardMetadataDraft();
-  }
-
-  function changeSortDirection(direction: "asc" | "desc") {
-    const nextSearchParams = new URLSearchParams(searchParams);
-    if (direction === "asc") nextSearchParams.delete("sort");
-    else nextSearchParams.set("sort", direction);
-    setSearchParams(nextSearchParams, { preventScrollReset: true });
   }
 
   function renderMaterial(material: MaterialTreeNode) {
@@ -683,28 +667,6 @@ export default function Home() {
         <section className="library-section" aria-labelledby="library-heading">
           <div className="section-heading">
             <h2 id="library-heading">Your Library</h2>
-            <div
-              className="library-sort"
-              role="group"
-              aria-label="Sort Materials by title"
-            >
-              <button
-                className="button button-secondary"
-                type="button"
-                aria-pressed={sortDirection === "asc"}
-                onClick={() => changeSortDirection("asc")}
-              >
-                Title A-Z
-              </button>
-              <button
-                className="button button-secondary"
-                type="button"
-                aria-pressed={sortDirection === "desc"}
-                onClick={() => changeSortDirection("desc")}
-              >
-                Title Z-A
-              </button>
-            </div>
           </div>
           {materials.length === 0 ? (
             <p className="empty-state">
@@ -712,7 +674,7 @@ export default function Home() {
             </p>
           ) : (
             <ul className="material-list" aria-label="Library Materials">
-              {sortedMaterials.map(renderMaterial)}
+              {materials.map(renderMaterial)}
             </ul>
           )}
         </section>

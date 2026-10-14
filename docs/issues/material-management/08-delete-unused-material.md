@@ -29,4 +29,9 @@ Source: [approved PRD](../../features/material-management.md). Apply the shared 
 
 ## Exclusions
 
-Deleting practice records, removing Sprint references to force eligibility, undo/trash behavior, and automatic child relocation. Retain children by moving them out first. Unresolved contracts block this whole safety-sensitive slice rather than permitting an unprotected partial delivery.
+Deleting practice records, removing Sprint references to force eligibility,
+undo/trash behavior, and automatic child relocation. Moving is deferred; this
+release does not offer retaining descendants by moving them out first. If the
+subtree should be retained, cancel deletion and use archiving instead.
+Unresolved contracts block this whole safety-sensitive slice rather than
+permitting an unprotected partial delivery.

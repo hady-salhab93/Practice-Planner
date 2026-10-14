@@ -242,26 +242,6 @@ button:focus-visible {
   gap: 0.5rem;
 }
 
-.library-sort {
-  display: flex;
-  flex: 0 0 auto;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.library-sort .button {
-  min-height: 2rem;
-  padding: 0.3rem 0.55rem;
-  border: 0;
-  border-radius: 0;
-}
-
-.library-sort .button[aria-pressed="true"] {
-  color: var(--primary-foreground);
-  background: var(--primary);
-}
-
 .material-actions .button-secondary {
   min-height: 2rem;
   padding: 0.3rem 0.5rem;
@@ -517,6 +497,12 @@ button:focus-visible {
   .material-row {
     align-items: flex-start;
     flex-wrap: wrap;
+  }
+
+  .material-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .material-heading {
