@@ -15,6 +15,7 @@ apps/
       routes.ts           Explicit route configuration
       routes/
         home.tsx          Current Library page, loader, action, and UI
+        sprints.tsx       Sprint creation and browsing page, loader, action, and UI
       app.css             Global application styles
 packages/
   core/                   Domain operations and PostgreSQL persistence
@@ -25,6 +26,9 @@ packages/
       material-operations.ts
                           Material rules and database operations
       material-operations.test.ts
+      sprint-operations.ts
+                          Sprint calendar rules and database operations
+      sprint-operations.test.ts
     drizzle/              Database migrations
 docker/                   Local infrastructure configuration
 docs/                     Product, architecture, workflow, and engineering docs
@@ -127,10 +131,14 @@ pattern used by other repositories.
 - Change the document shell or global styles: start in `root.tsx` or `app.css`.
 - Change Material validation, hierarchy operations, or persistence: start in
   `packages/core/src/material-operations.ts` and its tests.
+- Change Sprint calendar rules or persistence: start in
+  `packages/core/src/sprint-operations.ts` and its tests; the page is
+  `apps/local/app/routes/sprints.tsx`.
 - Change tables or migrations: start in `packages/core/src/schema.ts` or
   `packages/core/drizzle/`; follow the repository's database workflow.
 - Change approved product behavior: consult the feature PRD before implementing
-  it. The current code only implements a small part of the planned application.
+  it. Material management and Sprint creation/browsing are the implemented
+  product slices; other planned workflows remain unimplemented.
 
 The [stack-planning guide](../STACK_PLANNING.md) and
 [accepted full-stack architecture](../adr/0004-react-router-fullstack-postgresql.md)

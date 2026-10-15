@@ -14,8 +14,9 @@ This PRD records the discovery agreement confirmed on 2026-10-15 for
 [Feature #18](https://github.com/hady-salhab93/Practice-Planner/issues/18), under
 [Epic #16](https://github.com/hady-salhab93/Practice-Planner/issues/16).
 The user approved Story publication on 2026-10-15; GitHub owns the published
-backlog linked below. Publication does not authorize implementation.
-No behavior described here is claimed as implemented.
+backlog linked below. Implementation is authorized for Story #24 only. The
+remaining Stories are still gated, and no behavior from those slices is claimed
+as implemented.
 
 Use the [glossary](../../GLOSSARY.md) for Material and Library terminology.
 The [Material management PRD](material-management.md) owns Library behavior;
@@ -173,9 +174,10 @@ duplicate local issue bodies.
 | [#28: Delete a future Sprint safely](https://github.com/hady-salhab93/Practice-Planner/issues/28)              | #26                                  |
 | [#29: Filter Sprint selection by Tags](https://github.com/hady-salhab93/Practice-Planner/issues/29)            | #26 and real Material classification |
 
-All six are native sub-issues of Feature #18. No `ready-for-agent` labels or
-implementation authorization were granted. Naming and interaction questions
-remain explicit in the relevant Stories.
+All six are native sub-issues of Feature #18. No `ready-for-agent` labels were
+applied. Implementation is authorized only for Story #24; the remaining
+Stories are not authorized. Naming and interaction questions remain explicit
+in the relevant Stories.
 
 Tag filtering has `needs-info` and remains discovery-gated. Its classification
 implementation Story is not yet published; the
@@ -183,8 +185,8 @@ implementation Story is not yet published; the
 are a requirements source, not an actionable completed blocker. Add the native
 classification dependency when its owning Story exists.
 
-The creation Story is the dependency frontier, not permission to implement it.
-No prefactoring Story is justified by the current evidence.
+Story #24 is the current implementation frontier under explicit user
+authorization. No prefactoring Story is justified by the current evidence.
 
 ## Verification Agreement
 
@@ -201,9 +203,11 @@ The user approved these seams for TDD on 2026-10-15:
 
 Follow [testing standards](../TESTING_STANDARDS.md) and
 [running checks](../agents/testing.md). Implement one failing behavioral test
-and its minimal working slice at a time after implementation authorization.
-Test seams are approved; no red/green cycles or application checks have been
-run for this documentation-only PRD.
+and its minimal working slice at a time. Story #24 core operations are tested
+against disposable PostgreSQL with controlled time and timezone inputs. A
+focused browser check verified creation, reloading, recoverable overlap errors,
+the empty-current state, Cancel, and the unsaved-navigation warning at narrow
+and desktop widths in both themes.
 
 ## Cross-Feature Gates And Remaining Questions
 
@@ -217,9 +221,11 @@ run for this documentation-only PRD.
 - Practice reports and daily observations must use the saved application
   timezone consistently once their contracts are approved; their date/input
   semantics are not finalized by this Sprint PRD.
-- Detailed naming validation, duplicate-name policy, selection controls,
-  pending/duplicate submission behavior, and overlap/stale-edit error copy must
-  be settled during Story design before asserting new requirements in tests.
+- Story #24 currently trims names, rejects blank names, allows duplicate names,
+  and prevents duplicate form submission while saving. These are conservative
+  implementation defaults, not a broader uniqueness policy.
+- Selection controls and overlap/stale-edit error copy must be settled during
+  the relevant Story design before asserting new requirements in tests.
 - Exact schema, concurrency/constraint mechanisms, routes, and component
   primitives are implementation decisions, not new product vocabulary.
 - Story #29 requires additional filter interaction discovery, including controls,
