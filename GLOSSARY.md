@@ -12,6 +12,9 @@ _Avoid_: Practice Item
 The collection of Material available for planning practice.
 _Avoid_: Backlog
 
+**Sprint**:
+A named calendar window for organizing a practice focus.
+
 **Tag group**:
 A user-defined dimension for classifying Material, such as Kind, Focus, or Style.
 _Avoid_: Practice area

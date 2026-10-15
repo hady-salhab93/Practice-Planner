@@ -29,6 +29,13 @@
       "when": 1791960505027,
       "tag": "0003_root-only-material-archiving",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792056848552,
+      "tag": "0004_create_calendar_sprints",
+      "breakpoints": true
     }
   ]
 }

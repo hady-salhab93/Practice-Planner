@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  date,
+  index,
   integer,
   pgTable,
   text,
@@ -61,3 +63,42 @@ export const materialReferences = pgTable("material_references", {
 });
 
 export type MaterialReference = typeof materialReferences.$inferSelect;
+
+export const applicationSettings = pgTable(
+  "application_settings",
+  {
+    id: integer().primaryKey().default(1),
+    timeZone: text("time_zone").notNull(),
+  },
+  (table) => [
+    check("application_settings_singleton", sql`${table.id} = 1`),
+    check(
+      "application_settings_timezone_not_blank",
+      sql`length(btrim(${table.timeZone})) > 0`,
+    ),
+  ],
+);
+
+export const sprints = pgTable(
+  "sprints",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    name: text().notNull(),
+    goal: text(),
+    startDate: date("start_date", { mode: "string" }).notNull(),
+    endDate: date("end_date", { mode: "string" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "sprints_name_not_blank",
+      sql`length(btrim(${table.name}, ${titleEdgeWhitespace})) > 0`,
+    ),
+    check("sprints_date_order", sql`${table.endDate} >= ${table.startDate}`),
+    index("sprints_start_date_idx").on(table.startDate),
+  ],
+);
+
+export type Sprint = typeof sprints.$inferSelect;

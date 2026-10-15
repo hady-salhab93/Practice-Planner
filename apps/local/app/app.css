@@ -83,6 +83,111 @@ body {
   gap: 0.5rem;
 }
 
+.sprint-page .capture-section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.sprint-page .capture-section h2 {
+  margin-bottom: 0;
+}
+
+.sprint-timezone,
+.sprint-empty-state {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.sprint-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sprint-date-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.sprint-date-fields > div {
+  min-width: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sprint-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+}
+
+.sprint-list-section {
+  padding-top: 1.75rem;
+}
+
+.sprint-list {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.sprint-row {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.sprint-row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sprint-row-heading h3 {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.sprint-status {
+  flex: none;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.sprint-status-current {
+  color: var(--foreground);
+  border-color: var(--foreground);
+}
+
+.sprint-dates,
+.sprint-goal,
+.sprint-empty-material {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.sprint-dates {
+  font-variant-numeric: tabular-nums;
+}
+
+.sprint-goal {
+  color: var(--foreground);
+  white-space: pre-wrap;
+}
+
 label {
   font-size: 0.875rem;
   font-weight: 500;
@@ -619,6 +724,10 @@ button:focus-visible,
 
   .form-row input {
     flex-basis: 100%;
+  }
+
+  .sprint-date-fields {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .material-row {
