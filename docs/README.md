@@ -5,7 +5,8 @@
 - Product planning proceeds feature by feature. The previous application-wide specification, product ADRs, and draft implementation issues have been removed.
 - [Material management and breakdown](features/material-management.md): approved feature PRD, with unresolved Sprint and timer dependencies explicit; not implemented.
 - [Library pagination](features/library-pagination.md): replacement release spec;
-  sorting and moving are deferred. Pagination is not yet implemented.
+  sorting and moving are deferred. Server-side paging and page navigation are
+  implemented; full acceptance verification remains open.
 - [Material management implementation issues](https://github.com/hady-salhab93/Practice-Planner/issues/9): GitHub owns the implementation backlog; the feature PRD retains delivery and cross-feature gates.
 - [Application decision map](planning/map.md): agreed purpose and the route toward feature boundaries and a first useful version; not an implementation plan.
 - [Glossary](../GLOSSARY.md): agreed Material, Library, and classification terminology; feature PRDs own behavior.

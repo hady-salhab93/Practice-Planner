@@ -5,7 +5,16 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { useBlocker, useFetcher, useLoaderData } from "react-router";
+import {
+  Link,
+  redirect,
+  useBlocker,
+  useFetcher,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useNavigation,
+} from "react-router";
 import {
   Archive,
   Check,
@@ -26,7 +35,7 @@ import {
   createStandaloneMaterial,
   InvalidMaterialTitleError,
   InvalidMaterialReferenceError,
-  listLibraryMaterialTree,
+  listLibraryMaterialPage,
   listArchivedMaterialTree,
   MaterialNotFoundError,
   MaterialTitleConflictError,
@@ -50,13 +59,35 @@ type MaterialMetadataDraft = {
   }>;
 };
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+  const url = new URL(request.url);
+  const requestedPage = parseLibraryPageParam(url.searchParams.get("page"));
   const database = getDatabase();
-  const [materials, archivedMaterials] = await Promise.all([
-    listLibraryMaterialTree(database),
+  const [libraryPage, archivedMaterials] = await Promise.all([
+    listLibraryMaterialPage(database, requestedPage),
     listArchivedMaterialTree(database),
   ]);
-  return { materials, archivedMaterials };
+  const currentPageParam = url.searchParams.get("page");
+  if (
+    currentPageParam !== null &&
+    currentPageParam !== String(libraryPage.page)
+  ) {
+    url.searchParams.set("page", String(libraryPage.page));
+    throw redirect(`${url.pathname}${url.search}${url.hash}`);
+  }
+  return { ...libraryPage, archivedMaterials };
+}
+
+export function parseLibraryPageParam(value: string | null): number {
+  if (value === null || !/^[1-9]\d*$/.test(value)) return 1;
+  const page = Number(value);
+  return Number.isSafeInteger(page) ? page : Number.MAX_SAFE_INTEGER;
+}
+
+export function getLibraryPageSearch(search: string, page: number): string {
+  const searchParams = new URLSearchParams(search);
+  searchParams.set("page", String(page));
+  return `?${searchParams.toString()}`;
 }
 
 export function shouldRevalidate({
@@ -256,7 +287,17 @@ function isFailedAction(result: unknown): result is { ok: false } {
 }
 
 export default function Home() {
-  const { materials, archivedMaterials } = useLoaderData<typeof loader>();
+  const {
+    materials,
+    archivedMaterials,
+    page,
+    pageCount,
+    standaloneTotal,
+    materialTotal,
+  } = useLoaderData<typeof loader>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const navigation = useNavigation();
   const createFetcher = useFetcher<typeof action>();
   const searchFetcher = useFetcher<typeof action>();
   const archiveFetcher = useFetcher<typeof action>();
@@ -280,6 +321,15 @@ export default function Home() {
   } | null>(null);
   const submittedMetadataId = useRef<string | null>(null);
   const visibleMaterials = view === "library" ? materials : archivedMaterials;
+  const isPageNavigation =
+    navigation.state !== "idle" &&
+    navigation.location?.pathname === location.pathname &&
+    navigation.location.search !== location.search;
+  const pendingPage = isPageNavigation
+    ? parseLibraryPageParam(
+        new URLSearchParams(navigation.location?.search ?? "").get("page"),
+      )
+    : page;
   const editingMetadataMaterial = findMaterial(
     visibleMaterials,
     editingMetadataId,
@@ -300,8 +350,18 @@ export default function Home() {
     editingMetadataMaterial !== undefined &&
     draftMetadata !== null &&
     hasMetadataChanges(editingMetadataMaterial, draftMetadata);
+  const submittedCreateDraft = submittedCreate.current;
+  const successfulRootCreate =
+    createFetcher.state === "idle" &&
+    createFetcher.data?.intent === "create" &&
+    createFetcher.data.ok &&
+    createFetcher.data.parentId === null &&
+    submittedCreateDraft !== null &&
+    submittedCreateDraft.parentId === null &&
+    submittedCreateDraft.title === createTitle &&
+    createFetcher.data.submittedTitle === createTitle;
   const isDirty =
-    createTitle.length > 0 ||
+    (createTitle.length > 0 && !successfulRootCreate) ||
     Object.values(childDrafts).some((title) => title.length > 0) ||
     metadataIsDirty;
   const blocker = useBlocker(isDirty);
@@ -334,9 +394,27 @@ export default function Home() {
           return nextDrafts;
         });
       }
+      if (submitted.parentId === null && page !== pageCount) {
+        navigate({
+          pathname: location.pathname,
+          search: getLibraryPageSearch(location.search, pageCount),
+          hash: location.hash,
+        });
+      }
     }
     submittedCreate.current = null;
-  }, [childDrafts, createFetcher.data, createFetcher.state, createTitle]);
+  }, [
+    childDrafts,
+    createFetcher.data,
+    createFetcher.state,
+    createTitle,
+    location.hash,
+    location.pathname,
+    location.search,
+    navigate,
+    page,
+    pageCount,
+  ]);
 
   useEffect(() => {
     if (
@@ -400,7 +478,8 @@ export default function Home() {
     !metadataFetcher.data.ok
       ? metadataFetcher.data.message
       : undefined;
-  const materialCount = countMaterials(visibleMaterials);
+  const materialCount =
+    view === "library" ? materialTotal : countMaterials(archivedMaterials);
 
   function discardMetadataDraft() {
     setEditingMetadataId(null);
@@ -867,6 +946,65 @@ export default function Home() {
                 renderMaterial(material, true),
               )}
             </ul>
+          )}
+          {view === "library" && !searchResults && pageCount > 1 && (
+            <nav
+              className="library-pagination"
+              aria-label="Library pages"
+              aria-busy={isPageNavigation}
+            >
+              {page > 1 ? (
+                <Link
+                  className="button button-secondary"
+                  to={{
+                    pathname: location.pathname,
+                    search: getLibraryPageSearch(location.search, page - 1),
+                    hash: location.hash,
+                  }}
+                  aria-label="Previous page"
+                >
+                  Previous
+                </Link>
+              ) : (
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  disabled
+                  aria-label="Previous page"
+                >
+                  Previous
+                </button>
+              )}
+              <p className="library-pagination-status" aria-live="polite">
+                {isPageNavigation
+                  ? `Loading page ${pendingPage}…`
+                  : `Page ${page} of ${pageCount} · ${standaloneTotal} standalone ${
+                      standaloneTotal === 1 ? "Material" : "Materials"
+                    }`}
+              </p>
+              {page < pageCount ? (
+                <Link
+                  className="button button-secondary"
+                  to={{
+                    pathname: location.pathname,
+                    search: getLibraryPageSearch(location.search, page + 1),
+                    hash: location.hash,
+                  }}
+                  aria-label="Next page"
+                >
+                  Next
+                </Link>
+              ) : (
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  disabled
+                  aria-label="Next page"
+                >
+                  Next
+                </button>
+              )}
+            </nav>
           )}
         </section>
       </main>

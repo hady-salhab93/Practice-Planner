@@ -123,7 +123,8 @@ textarea {
 
 input:focus-visible,
 textarea:focus-visible,
-button:focus-visible {
+button:focus-visible,
+.button:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
@@ -141,6 +142,7 @@ button:focus-visible {
   font-size: 0.875rem;
   font-weight: 500;
   white-space: nowrap;
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -175,6 +177,23 @@ button:focus-visible {
 
 .section-heading h2 {
   margin: 0;
+}
+
+.library-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 1rem;
+}
+
+.library-pagination-status {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .library-heading {

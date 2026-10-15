@@ -18,7 +18,7 @@ Status: product planning has been reset for feature-by-feature discovery. The ar
 
 ## Features
 
-The first Material management slice is implemented: standalone Material can be added to the Library, renamed, and found by title search with its hierarchy context. See the [approved feature PRD](docs/features/material-management.md) and [GitHub implementation issues](https://github.com/hady-salhab93/Practice-Planner/issues/9) for scope and remaining work.
+The first Material management slice is implemented: standalone Material can be added to the Library, renamed, and found by title search with its hierarchy context. The Library also browses standalone Material in 20-root pages while keeping each root's subtree together. See the [approved feature PRD](docs/features/material-management.md), [pagination specification](docs/features/library-pagination.md), and [GitHub implementation issues](https://github.com/hady-salhab93/Practice-Planner/issues/9) for scope and remaining work.
 
 ## Getting Started
 
@@ -40,7 +40,7 @@ The local app runs at the URL printed by React Router. PostgreSQL runs in Docker
 
 ## Usage
 
-The Library supports adding and renaming standalone Material, plus case-insensitive title search across the saved hierarchy. Search results show their ancestor paths and open the selected Material in context. Other product workflows remain future work.
+The Library supports adding and renaming standalone Material, case-insensitive title search across the saved hierarchy, and browsing standalone Material in 20-root pages with nested context intact. Page navigation is represented in the URL, and search results show their ancestor paths and open the selected Material in context. Other product workflows remain future work.
 
 ## Architecture
 

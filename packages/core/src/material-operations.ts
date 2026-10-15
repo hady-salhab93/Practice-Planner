@@ -1,4 +1,14 @@
-import { and, asc, eq, isNull, max, notInArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  max,
+  notInArray,
+  sql,
+} from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema.js";
 import {
@@ -14,6 +24,16 @@ type Database = NodePgDatabase<typeof schema>;
 export type MaterialTreeNode = Material & {
   children: MaterialTreeNode[];
   references: MaterialReference[];
+};
+
+export const LIBRARY_PAGE_SIZE = 20;
+
+export type LibraryMaterialPage = {
+  materials: MaterialTreeNode[];
+  page: number;
+  pageCount: number;
+  standaloneTotal: number;
+  materialTotal: number;
 };
 
 export type LibraryMaterialSearchResult = {
@@ -148,6 +168,40 @@ export async function listLibraryMaterialTree(
   return loadMaterialTree(database, false);
 }
 
+export async function listLibraryMaterialPage(
+  database: Database,
+  requestedPage: number,
+): Promise<LibraryMaterialPage> {
+  const [rootCountRows, materialTotal] = await Promise.all([
+    database
+      .select({ count: sql<number>`count(*)::int` })
+      .from(materials)
+      .where(and(isNull(materials.parentId), isNull(materials.archivedAt))),
+    countLibraryMaterials(database),
+  ]);
+  const standaloneTotal = rootCountRows[0]?.count ?? 0;
+  const pageCount = Math.max(1, Math.ceil(standaloneTotal / LIBRARY_PAGE_SIZE));
+  const page =
+    Number.isSafeInteger(requestedPage) && requestedPage > 0
+      ? Math.min(requestedPage, pageCount)
+      : 1;
+  const roots = await database
+    .select()
+    .from(materials)
+    .where(and(isNull(materials.parentId), isNull(materials.archivedAt)))
+    .orderBy(asc(materials.position), asc(materials.id))
+    .limit(LIBRARY_PAGE_SIZE)
+    .offset((page - 1) * LIBRARY_PAGE_SIZE);
+
+  return {
+    materials: await loadMaterialTreeFromRoots(database, roots),
+    page,
+    pageCount,
+    standaloneTotal,
+    materialTotal,
+  };
+}
+
 export async function listArchivedMaterialTree(
   database: Database,
 ): Promise<MaterialTreeNode[]> {
@@ -158,26 +212,69 @@ async function loadMaterialTree(
   database: Database,
   archivedRoots: boolean,
 ): Promise<MaterialTreeNode[]> {
-  const [rows, references] = await Promise.all([
-    database
-      .select()
-      .from(materials)
-      .orderBy(asc(materials.position), asc(materials.id)),
-    database
-      .select()
-      .from(materialReferences)
-      .orderBy(asc(materialReferences.position), asc(materialReferences.id)),
-  ]);
+  const roots = await database
+    .select()
+    .from(materials)
+    .where(
+      and(
+        isNull(materials.parentId),
+        archivedRoots
+          ? isNotNull(materials.archivedAt)
+          : isNull(materials.archivedAt),
+      ),
+    )
+    .orderBy(asc(materials.position), asc(materials.id));
+  return loadMaterialTreeFromRoots(database, roots);
+}
+
+async function loadMaterialTreeFromRoots(
+  database: Database,
+  roots: Material[],
+): Promise<MaterialTreeNode[]> {
+  if (roots.length === 0) return [];
+
+  const rootIds = roots.map((root) => root.id);
+  const subtreeIds = sql`(
+    with recursive selected_materials(id) as (
+      select id
+      from materials
+      where ${inArray(materials.id, rootIds)}
+      union all
+      select child.id
+      from materials as child
+      inner join selected_materials as parent on child.parent_id = parent.id
+    )
+    select id from selected_materials
+  )`;
+  const rows = await database
+    .select()
+    .from(materials)
+    .where(inArray(materials.id, subtreeIds))
+    .orderBy(asc(materials.position), asc(materials.id));
+  const references = await database
+    .select()
+    .from(materialReferences)
+    .where(
+      inArray(
+        materialReferences.materialId,
+        rows.map((row) => row.id),
+      ),
+    )
+    .orderBy(asc(materialReferences.position), asc(materialReferences.id));
   const nodes = new Map<string, MaterialTreeNode>();
-  const roots: MaterialTreeNode[] = [];
+  const referencesByMaterial = new Map<string, MaterialReference[]>();
+
+  for (const reference of references) {
+    const existing = referencesByMaterial.get(reference.materialId) ?? [];
+    existing.push(reference);
+    referencesByMaterial.set(reference.materialId, existing);
+  }
 
   for (const material of rows) {
     nodes.set(material.id, {
       ...material,
       children: [],
-      references: references.filter(
-        (reference) => reference.materialId === material.id,
-      ),
+      references: referencesByMaterial.get(material.id) ?? [],
     });
   }
 
@@ -185,16 +282,36 @@ async function loadMaterialTree(
     const node = nodes.get(material.id);
     if (!node) continue;
 
-    if (material.parentId === null) {
-      if ((material.archivedAt !== null) === archivedRoots) roots.push(node);
-      continue;
-    }
+    if (material.parentId === null) continue;
 
     const parent = nodes.get(material.parentId);
     if (parent) parent.children.push(node);
   }
 
-  return roots;
+  return rootIds.flatMap((rootId) => {
+    const root = nodes.get(rootId);
+    return root ? [root] : [];
+  });
+}
+
+async function countLibraryMaterials(database: Database): Promise<number> {
+  const result = await database.execute(sql<{ count: number }>`
+    with recursive visible_materials(id) as (
+      select id
+      from materials
+      where parent_id is null and archived_at is null
+      union all
+      select child.id
+      from materials as child
+      inner join visible_materials as parent on child.parent_id = parent.id
+    )
+    select count(*)::int as count from visible_materials
+  `);
+  const count = result.rows[0]?.count;
+  if (typeof count !== "number") {
+    throw new Error("Counting Library Material returned no numeric result.");
+  }
+  return count;
 }
 
 export async function searchLibraryMaterials(
