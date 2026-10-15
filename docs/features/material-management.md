@@ -37,6 +37,20 @@ Recorded practice remains attached to its original Material and is never
 redistributed when the Library changes. These are product requirements, not
 claims of implementation or authorization to implement.
 
+## Deletion Safety Discovery Update: 2026-10-15
+
+The user approved the [deletion safety contracts](material-deletion-safety.md)
+for Sprint subtree selection and deferral, explicit inclusion of later
+descendants, protection through existing Sprint memberships and saved or
+in-progress practice, and archiving without disrupting existing commitments
+or timers. That agreement also requires refreshed deletion confirmation when
+subtree membership changes and atomic protection checks at deletion.
+
+Permanent deletion remains blocked until the real prerequisite workflows and
+persistence contracts are implemented and verified. The linked agreement
+proposes separate prerequisite slices; it does not authorize implementation
+or close the Delete story.
+
 ## User Stories
 
 1. As a guitarist, I want to capture material before fully analyzing it so that I can return to it later.
@@ -110,6 +124,9 @@ claims of implementation or authorization to implement.
 - Require confirmation identifying the Material and the number of descendants that will be removed.
 - Block deletion if the selected Material or any descendant has recorded practice or a Sprint reference. This protection applies to archived Material as well.
 - When deletion is blocked, explain why and offer archiving instead. Deletion must not erase practice records or break Sprint references.
+- [Deletion safety contracts](material-deletion-safety.md) define which Sprint
+  memberships and practice states protect Material, the root-scoped archiving
+  alternative for nested Material, and stale-confirmation handling.
 
 ### Historical Integrity
 
@@ -153,8 +170,8 @@ These scenarios are requirements for future verification, not claims of passing 
 
 The following cross-feature agreements are approved at discovery level. Their detailed interaction contracts belong in the owning feature PRDs and still block affected integration work, not basic capture and organization:
 
-- **Sprint planning and refinement:** Tag groups can filter and help select Material. What a Sprint references, whether selecting a parent includes descendants, and how adding children, archiving, or restoring Material affects planned or active commitments remain open. Move effects are deferred with the move feature.
-- **Focused timing:** V1 allows missed practice to be entered for any past date as one Material and a focused-time duration, then edited or deleted. Timer records count only unpaused time, continue while the app is backgrounded until explicitly paused or stopped, and can be edited or deleted. An unexpectedly interrupted timer returns unconfirmed for user confirmation or duration adjustment. Material eligibility, timer controls, and hierarchy/archive changes during a running timer remain open.
+- **Sprint planning and refinement:** Tag groups can filter and help select Material. The [deletion safety agreement](material-deletion-safety.md) settles current-subtree selection, subtree deferral, explicit inclusion of later descendants, membership protection, and preservation of existing memberships through archiving. Sprint lifecycle, controls, and remaining interactions belong to the owning feature discovery. Move effects are deferred with the move feature.
+- **Focused timing:** V1 allows missed practice to be entered for any past date as one Material and a focused-time duration, then edited or deleted. Timer records count only unpaused time, continue while the app is backgrounded until explicitly paused or stopped, and can be edited or deleted. An unexpectedly interrupted timer returns unconfirmed for user confirmation or duration adjustment. The [deletion safety agreement](material-deletion-safety.md) protects saved and in-progress practice and preserves activity through archiving. Eligibility, timer controls, recovery mechanics, and date/timezone boundaries remain open.
 - **Daily observations:** V1 allows one optional day-level summary per practice date across that day's practice; per-Material notes are not required. Detailed capture and editing behavior remains open.
 - **Sprint review:** compare practice time within each user-defined Tag group using current Material classification, names, and hierarchy, including for ended Sprints. Multiple-Tag totals overlap as specified above. Review layout, comparisons beyond these groups, and historical-to-current Material navigation remain open.
 - **Delivery:** unresolved database provisioning and durability choices remain in [stack planning](../STACK_PLANNING.md). This PRD does not silently settle them.
@@ -189,16 +206,19 @@ required outcome.
 - Local PostgreSQL uses Docker Compose on localhost with a persistent named
   volume. Backups are deferred; this does not approve production infrastructure.
 - Permanent deletion remains blocked until approved and implemented
-  Sprint-reference and practice-record contracts support authoritative subtree
-  eligibility checks. Never invent those schemas or use a permanently empty
-  protection check. Recheck eligibility at the destructive operation so stale
-  confirmation cannot delete newly protected Material.
-- Resolve breakdown, archiving, and restoration effects on planned or active
-  Sprint commitments before connecting Library mutations to Sprints. Revisit
-  move effects only if moving is approved in the future.
-- Resolve hierarchy/archive changes during timing and timing eligibility in the
-  timing feature. Library actions must not silently start, stop, or retarget a
-  timer.
+  [Sprint, practice-record, and in-progress practice contracts](material-deletion-safety.md)
+  support authoritative subtree eligibility checks. Never invent those schemas
+  or use a permanently empty protection check. Atomically recheck eligibility
+  at the destructive operation; changed subtree membership requires refreshed
+  confirmation and newly protected Material must not be deleted.
+- Implement the approved subtree-selection, deferral, explicit-inclusion, and
+  archive-preservation contracts before connecting Library mutations to Sprints.
+  Resolve remaining lifecycle and interaction details in the owning feature.
+  Revisit move effects only if moving is approved in the future.
+- Archiving preserves existing timer activity and its Material identity.
+  Resolve remaining timing eligibility and lifecycle behavior in the timing
+  feature. Library actions must not silently start, stop, discard, or retarget
+  a timer.
 - Preserve earlier practice on its original Material when children are added.
   Ended Sprint views must reflect current Material names, hierarchy, and Tags,
   while retaining access to the original Material, including archived

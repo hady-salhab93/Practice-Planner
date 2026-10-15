@@ -4,6 +4,10 @@
 
 - Product planning proceeds feature by feature. The previous application-wide specification, product ADRs, and draft implementation issues have been removed.
 - [Material management and breakdown](features/material-management.md): approved feature PRD, with unresolved Sprint and timer dependencies explicit; not implemented.
+- [Material deletion safety](features/material-deletion-safety.md): approved
+  Sprint membership, practice protection, archiving, and stale-confirmation
+  contracts, with proposed prerequisite slices. Delete remains blocked on their
+  real implementation and verification.
 - [Library pagination](features/library-pagination.md): replacement release spec;
   sorting and moving are deferred. Server-side paging and page navigation are
   implemented; full acceptance verification remains open.
