@@ -21,7 +21,9 @@ check to deliver Delete early.
 The owning feature work is
 [Sprint planning](https://github.com/hady-salhab93/Practice-Planner/issues/18)
 and [focused practice](https://github.com/hady-salhab93/Practice-Planner/issues/20).
-Their complete interaction designs remain separate discovery work. Retain the
+The [Sprint planning PRD](sprint-planning.md) now owns its approved calendar and
+membership workflow; practice interaction designs remain separate discovery
+work. Retain the
 accepted [React Router/PostgreSQL architecture](../adr/0004-react-router-fullstack-postgresql.md);
 this agreement does not choose schemas or new infrastructure.
 
@@ -121,9 +123,11 @@ real membership; removal clears only the removed membership's protection;
 other and ended-Sprint memberships remain protective; archived Material remains
 accessible from existing Sprint context.
 
-**Dependencies:** complete the minimum Sprint creation, lifecycle, and membership
-interaction discovery under Sprint planning. This does not require Tag filtering
-or the full Sprint review UI.
+**Dependencies:** implement and verify the approved
+[Sprint planning Stories #24, #26, and #27](sprint-planning.md#published-story-breakdown).
+The PRD establishes creation, calendar lifecycle, membership, and destination
+deferral behavior; remaining Story-design questions must be resolved before
+implementation. This does not require Tag filtering or the full Sprint review UI.
 
 ### 2. Persist And Correct Practice Records
 
@@ -170,9 +174,11 @@ strength of this document.
 
 ## Verification And Remaining Discovery
 
-Proposed test seams are the public core operations against disposable PostgreSQL
-and the user-facing Library/Sprint/practice workflows through real route
-loaders/actions. Confirm those seams with the user before writing TDD tests;
+The user approved public core-operation PostgreSQL tests and focused real browser
+workflows for [Sprint planning](sprint-planning.md#verification-agreement).
+The broader deletion and practice test seams remain proposals: public core
+operations against disposable PostgreSQL and user-facing workflows through real
+route loaders/actions. Confirm those seams before writing their TDD tests;
 follow [testing standards](../TESTING_STANDARDS.md).
 
 Required future scenarios include eligible nested and archived deletion;
@@ -185,9 +191,10 @@ side channel.
 
 Still unresolved in the owning features:
 
-- Sprint creation, dates/lifecycle, membership controls, optional future
-  destination interactions, and ended-Sprint editing policy beyond retaining
-  its memberships for this safety contract.
+- The [Sprint planning PRD](sprint-planning.md) settles creation, calendar
+  lifecycle, future destination semantics, and past-Sprint editing restrictions.
+  Remaining naming and detailed control/error design questions are explicit
+  there; approved requirements still require implementation and verification.
 - Practice input/validation, date/timezone rules, correction controls, and
   eligibility to begin new practice or select archived Material.
 - Timer controls, concurrency, interruption detection, and recovery mechanics.
