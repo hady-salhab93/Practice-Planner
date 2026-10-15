@@ -8,6 +8,10 @@
   Sprint membership, practice protection, archiving, and stale-confirmation
   contracts, with proposed prerequisite slices. Delete remains blocked on their
   real implementation and verification.
+- [Plan and refine Sprints](features/sprint-planning.md): approved calendar
+  lifecycle, Material selection/refinement, and deferral requirements for
+  Feature #18, with six published Story sub-issues and explicit blockers.
+  Implementation is not authorized; Tag filtering remains discovery-gated.
 - [Library pagination](features/library-pagination.md): replacement release spec;
   sorting and moving are deferred. Server-side paging and page navigation are
   implemented; full acceptance verification remains open.
