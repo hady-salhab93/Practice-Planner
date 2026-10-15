@@ -143,6 +143,7 @@ on 2026-10-14. The fixed page size and URL edge handling are pragmatic defaults
 synthesized for this spec; future discovery may revise them without restoring
 the deferred capabilities.
 
-Pagination is specified, not delivered. Code removal is not completion of
-pagination. Its issue should be ready for agent implementation, but acceptance
-checks remain unverified until executable and real-workflow evidence exists.
+Server-side root paging, URL page resolution, and page navigation are
+implemented. Full browser-history, editing-recovery, keyboard, and responsive
+workflow acceptance checks remain unverified; issue closure does not imply
+those checks have been completed.

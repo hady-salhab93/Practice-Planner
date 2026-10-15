@@ -10,6 +10,7 @@ import {
   createChildMaterial,
   createStandaloneMaterial,
   listArchivedMaterialTree,
+  listLibraryMaterialPage,
   listLibraryMaterialTree,
   listLibraryMaterials,
   renameMaterial,
@@ -70,6 +71,76 @@ describe("Material operations", () => {
     expect(library.at(-1)?.id).toBe(last.id);
     expect(library.find((material) => material.id === first.id)?.title).toBe(
       first.title,
+    );
+  });
+
+  it("pages standalone Material without separating descendants or references", async () => {
+    const roots = await Promise.all(
+      Array.from({ length: 21 }, (_, index) =>
+        createStandaloneMaterial(
+          database,
+          `Page root ${index} ${crypto.randomUUID()}`,
+        ),
+      ),
+    );
+    const child = await createChildMaterial(
+      database,
+      roots[0]!.id,
+      `Paged child ${crypto.randomUUID()}`,
+    );
+    const savedChild = await updateMaterialMetadata(database, child.id, {
+      description: "Kept with its root",
+      references: [{ label: "Tab", url: "https://example.com/paged-tab" }],
+    });
+    const orderedRoots = await listLibraryMaterials(database);
+    const firstRootIndex = orderedRoots.findIndex(
+      (material) => material.id === roots[0]!.id,
+    );
+    const firstPage = Math.floor(firstRootIndex / 20) + 1;
+    const lastPage = Math.floor((firstRootIndex + roots.length - 1) / 20) + 1;
+
+    for (let pageNumber = firstPage; pageNumber <= lastPage; pageNumber += 1) {
+      const page = await listLibraryMaterialPage(database, pageNumber);
+      const expectedRoots = orderedRoots.slice(
+        (pageNumber - 1) * 20,
+        pageNumber * 20,
+      );
+
+      expect(page.materials.map((material) => material.id)).toEqual(
+        expectedRoots.map((material) => material.id),
+      );
+      expect(page.page).toBe(pageNumber);
+      expect(page.standaloneTotal).toBe(orderedRoots.length);
+      expect(page.pageCount).toBe(Math.ceil(orderedRoots.length / 20));
+    }
+
+    const childPageNumber = Math.floor(firstRootIndex / 20) + 1;
+    const childPage = await listLibraryMaterialPage(database, childPageNumber);
+    const savedRoot = childPage.materials.find(
+      (material) => material.id === roots[0]!.id,
+    );
+    expect(savedRoot?.children).toContainEqual(
+      expect.objectContaining({
+        id: child.id,
+        description: "Kept with its root",
+        references: savedChild.references,
+      }),
+    );
+
+    const fullTree = await listLibraryMaterialTree(database);
+    const countTree = (nodes: typeof fullTree): number =>
+      nodes.reduce((count, node) => count + 1 + countTree(node.children), 0);
+    expect(childPage.materialTotal).toBe(countTree(fullTree));
+
+    const lastPageData = await listLibraryMaterialPage(
+      database,
+      Number.MAX_SAFE_INTEGER,
+    );
+    expect(lastPageData.page).toBe(lastPageData.pageCount);
+    expect(lastPageData.materials.map((material) => material.id)).toEqual(
+      orderedRoots
+        .slice((lastPageData.page - 1) * 20)
+        .map((material) => material.id),
     );
   });
 
