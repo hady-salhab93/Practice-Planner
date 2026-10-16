@@ -90,6 +90,7 @@ export const sprints = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    version: integer().notNull().default(1),
   },
   (table) => [
     check(

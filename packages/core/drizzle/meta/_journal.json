@@ -36,6 +36,13 @@
       "when": 1792056848552,
       "tag": "0004_create_calendar_sprints",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792110930389,
+      "tag": "0005_add_sprint_version",
+      "breakpoints": true
     }
   ]
 }

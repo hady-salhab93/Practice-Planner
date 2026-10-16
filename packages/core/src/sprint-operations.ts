@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema.js";
 import { applicationSettings, sprints, type Sprint } from "./schema.js";
@@ -119,6 +119,129 @@ export async function createSprint(
         .returning();
       if (!created) throw new Error("Sprint creation returned no saved row.");
       return created;
+    } catch (error) {
+      if (isExclusionViolation(error)) throw new SprintDateOverlapError();
+      throw error;
+    }
+  });
+}
+
+export type UpdateSprintInput = {
+  id: string;
+  name: string;
+  goal?: string | null;
+  startDate: string;
+  endDate: string;
+  expectedVersion?: number;
+};
+
+export class SprintEditConflictError extends Error {
+  constructor() {
+    super(
+      "This Sprint changed since you opened it. Reload to see the latest plan, then reapply your edit.",
+    );
+    this.name = "SprintEditConflictError";
+  }
+}
+
+export class SprintNotFoundError extends Error {
+  constructor() {
+    super("This Sprint no longer exists. Reload and try again.");
+    this.name = "SprintNotFoundError";
+  }
+}
+
+export class SprintDatesLockedError extends Error {
+  constructor() {
+    super(
+      "Dates of a past Sprint are locked. Only its name and goal can change.",
+    );
+    this.name = "SprintDatesLockedError";
+  }
+}
+
+export class SprintStartDateLockedError extends Error {
+  constructor() {
+    super(
+      "A current Sprint's start date is fixed. You can change its end date.",
+    );
+    this.name = "SprintStartDateLockedError";
+  }
+}
+
+export class SprintEndDateInPastError extends Error {
+  constructor() {
+    super("A current Sprint must end today or later.");
+    this.name = "SprintEndDateInPastError";
+  }
+}
+
+export async function updateSprint(
+  database: Database,
+  input: UpdateSprintInput,
+  options: SprintOperationOptions = {},
+): Promise<Sprint> {
+  const name = input.name.trim();
+  if (!name) throw new InvalidSprintNameError();
+
+  const startDate = parseCalendarDate(input.startDate);
+  const endDate = parseCalendarDate(input.endDate);
+  if (startDate === null || endDate === null || endDate < startDate) {
+    throw new InvalidSprintDateError();
+  }
+
+  const goal = input.goal?.trim() || null;
+  const now = options.now ?? new Date();
+
+  return database.transaction(async (transaction) => {
+    const [settings] = await transaction
+      .select({ timeZone: applicationSettings.timeZone })
+      .from(applicationSettings)
+      .where(eq(applicationSettings.id, 1))
+      .limit(1);
+    if (!settings) throw new MissingApplicationTimeZoneError();
+    const today = getCalendarDateInTimeZone(now, settings.timeZone);
+
+    const [existing] = await transaction
+      .select()
+      .from(sprints)
+      .where(eq(sprints.id, input.id))
+      .for("update");
+    if (!existing) throw new SprintNotFoundError();
+    if (
+      input.expectedVersion !== undefined &&
+      input.expectedVersion !== existing.version
+    ) {
+      throw new SprintEditConflictError();
+    }
+    const status = getSprintStatus(existing, today);
+    const datesChanged =
+      startDate !== existing.startDate || endDate !== existing.endDate;
+    if (status === "past") {
+      if (datesChanged) throw new SprintDatesLockedError();
+    } else if (status === "current") {
+      if (startDate !== existing.startDate) {
+        throw new SprintStartDateLockedError();
+      }
+      if (endDate < today) throw new SprintEndDateInPastError();
+    } else if (startDate < today) {
+      throw new SprintStartDateInPastError();
+    }
+
+    try {
+      const [updated] = await transaction
+        .update(sprints)
+        .set({
+          name,
+          goal,
+          startDate,
+          endDate,
+          version: sql`${sprints.version} + 1`,
+        })
+        .where(eq(sprints.id, input.id))
+        .returning();
+      if (!updated) throw new SprintNotFoundError();
+      return updated;
     } catch (error) {
       if (isExclusionViolation(error)) throw new SprintDateOverlapError();
       throw error;

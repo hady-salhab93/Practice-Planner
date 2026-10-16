@@ -18,7 +18,7 @@ Status: product planning has been reset for feature-by-feature discovery. The ar
 
 ## Features
 
-The first Material management slice is implemented: standalone Material can be added to the Library, renamed, and found by title search with its hierarchy context. The Library also browses standalone Material in 20-root pages while keeping each root's subtree together. Story #24 adds calendar Sprint creation and browsing with timezone-based lifecycle status; selection, editing, deferral, and deletion remain future work. See the [Material management PRD](docs/features/material-management.md), [pagination specification](docs/features/library-pagination.md), [Sprint planning PRD](docs/features/sprint-planning.md), and [GitHub implementation issues](https://github.com/hady-salhab93/Practice-Planner/issues/9).
+The first Material management slice is implemented: standalone Material can be added to the Library, renamed, and found by title search with its hierarchy context. The Library also browses standalone Material in 20-root pages while keeping each root's subtree together. Story #24 adds calendar Sprint creation and browsing with timezone-based lifecycle status; Story #25 adds status-aware Sprint editing with stale-edit protection; selection, deferral, and deletion remain future work. See the [Material management PRD](docs/features/material-management.md), [pagination specification](docs/features/library-pagination.md), [Sprint planning PRD](docs/features/sprint-planning.md), and [GitHub implementation issues](https://github.com/hady-salhab93/Practice-Planner/issues/9).
 
 ## Getting Started
 
