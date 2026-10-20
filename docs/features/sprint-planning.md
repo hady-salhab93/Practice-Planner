@@ -14,9 +14,10 @@ This PRD records the discovery agreement confirmed on 2026-10-15 for
 [Feature #18](https://github.com/hady-salhab93/Practice-Planner/issues/18), under
 [Epic #16](https://github.com/hady-salhab93/Practice-Planner/issues/16).
 The user approved Story publication on 2026-10-15; GitHub owns the published
-backlog linked below. Implementation is authorized for Story #24 only. The
-remaining Stories are still gated, and no behavior from those slices is claimed
-as implemented.
+backlog linked below. Story #24 was implemented first; Story #26 was explicitly
+authorized by an implementation task on 2026-10-16 and is now implemented.
+The remaining Stories are still gated, and no behavior from those slices is
+claimed as implemented.
 
 Use the [glossary](../../GLOSSARY.md) for Material and Library terminology.
 The [Material management PRD](material-management.md) owns Library behavior;
@@ -98,6 +99,12 @@ planned end even when no next Sprint exists.
   Sprint. Name and goal remain editable.
 - Past Sprint dates and Material membership are locked. Name and goal can
   be corrected.
+- Past Sprints are hidden by default, with a Show/Hide past Sprints control
+  for historical review. This changes visibility, not membership or protection.
+- Sprint plan editing and Material refinement open in right-side modal dialogs,
+  keeping the list stable. Cancel discards the draft; closing a dirty dialog
+  warns before discarding it. These interaction adjustments were approved
+  on 2026-10-17.
 - Only future Sprints can be deleted. Confirm before deleting, making clear
   that membership is removed but Material and practice are not.
 - Recheck future status when executing deletion; an old confirmation cannot
@@ -108,11 +115,23 @@ planned end even when no next Sprint exists.
 
 ### Material Selection And Context
 
+- Sprint Material branches start collapsed and expose a chevron control to
+  expand or collapse their children. Sprint-only trees do not repeat a
+  "Selected" badge. Edit and Manage Material are named icon controls in each
+  Sprint header, rather than actions below its Material list (approved
+  on 2026-10-19).
+
 - Select Material from the unarchived Library into a future or current Sprint.
   Selecting a parent includes that Material and its current descendants as
   saved membership.
-- Selecting nested Material does not implicitly select its ancestors. Show
-  hierarchy context without confusing contextual ancestors with membership.
+- Selecting nested Material does not implicitly select its ancestors. Sprint
+  summaries and selected-Material drafts show only selected identities: omit
+  unselected ancestors, siblings, and descendants, including children added
+  later. Selected descendants of an unselected node appear under the nearest
+  selected ancestor, or at the top level, without changing Library parentage.
+  The Available Library picker still shows the Library hierarchy. This
+  selected-only display replaces contextual ancestor rows by user request
+  on 2026-10-17.
 - Membership identifies existing Material; it does not clone the hierarchy
   or change parentage.
 - Later children added in the Library do not automatically join a Sprint.
@@ -185,8 +204,9 @@ implementation Story is not yet published; the
 are a requirements source, not an actionable completed blocker. Add the native
 classification dependency when its owning Story exists.
 
-Story #24 is the current implementation frontier under explicit user
-authorization. No prefactoring Story is justified by the current evidence.
+Story #24 and Story #26 are implemented under explicit user authorization.
+Story #25 and Stories #27–#29 remain gated. No prefactoring Story is justified
+by the current evidence.
 
 ## Verification Agreement
 
@@ -207,7 +227,18 @@ and its minimal working slice at a time. Story #24 core operations are tested
 against disposable PostgreSQL with controlled time and timezone inputs. A
 focused browser check verified creation, reloading, recoverable overlap errors,
 the empty-current state, Cancel, and the unsaved-navigation warning at narrow
-and desktop widths in both themes.
+and desktop widths in both themes. Story #26 adds PostgreSQL-backed checks for
+subtree membership, nested selection without ancestors, later descendants,
+removal scoped to one Sprint, membership protection, archive behavior, and
+past-Sprint locking. Its route workflow was checked for subtree selection,
+Cancel, saving, reload-visible membership, and subtree removal; the editor was
+also checked at narrow dark and desktop light viewports.
+
+The 2026-10-17 layout adjustment was checked through the real route workflow:
+past-Sprint visibility, selected-only saved and draft trees, side-dialog Save
+and Cancel, recoverable validation errors, dirty-dismiss confirmation, keyboard
+focus containment and restoration, and mobile navigation. Panel bounds and
+horizontal overflow were checked at narrow and desktop widths in both themes.
 
 ## Cross-Feature Gates And Remaining Questions
 
@@ -224,8 +255,9 @@ and desktop widths in both themes.
 - Story #24 currently trims names, rejects blank names, allows duplicate names,
   and prevents duplicate form submission while saving. These are conservative
   implementation defaults, not a broader uniqueness policy.
-- Selection controls and overlap/stale-edit error copy must be settled during
-  the relevant Story design before asserting new requirements in tests.
+- Story #26 uses separate Available Library and Selected Sprint trees, draft
+  Save/Cancel, and disabled selection controls while saving. These interaction
+  choices were confirmed during implementation on 2026-10-16.
 - Exact schema, concurrency/constraint mechanisms, routes, and component
   primitives are implementation decisions, not new product vocabulary.
 - Story #29 requires additional filter interaction discovery, including controls,

@@ -30,8 +30,8 @@ this agreement does not choose schemas or new infrastructure.
 ## Sprint Membership And Protection
 
 - Selecting Material for a Sprint includes that Material and its current
-  descendants as saved memberships. Ancestors displayed for context are not
-  implicitly selected.
+  descendants as saved memberships. Ancestors are not implicitly selected;
+  unselected Material is omitted from Sprint membership views.
 - Deferring selected Material removes it and its selected descendants from the
   current Sprint. It does not change the Library hierarchy or erase practice.
 - A future Sprint destination is optional. Removing membership without a
@@ -118,16 +118,18 @@ not completion.
 **Outcome:** select a current subtree for a real Sprint, explicitly include new
 descendants, and defer a selected subtree without changing the Library.
 
+**Status:** Story #26 now persists selection/refinement and exposes real
+membership protection. Destination deferral remains unimplemented.
+
 **Acceptance:** membership survives reload; optional future assignment produces
 real membership; removal clears only the removed membership's protection;
 other and ended-Sprint memberships remain protective; archived Material remains
 accessible from existing Sprint context.
 
-**Dependencies:** implement and verify the approved
-[Sprint planning Stories #24, #26, and #27](sprint-planning.md#published-story-breakdown).
-The PRD establishes creation, calendar lifecycle, membership, and destination
-deferral behavior; remaining Story-design questions must be resolved before
-implementation. This does not require Tag filtering or the full Sprint review UI.
+**Dependencies:** Stories #24 and #26 are implemented; Story #27 remains gated
+for destination deferral. The PRD establishes creation, calendar lifecycle,
+membership, and destination behavior. This does not require Tag filtering or
+the full Sprint review UI.
 
 ### 2. Persist And Correct Practice Records
 

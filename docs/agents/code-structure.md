@@ -11,11 +11,13 @@ for it.
 apps/
   local/                 React Router application and its server
     app/
-      root.tsx            HTML document and root route outlet
+      root.tsx            HTML document, shared sidebar shell, and route outlet
+      components/
+        app-sidebar.tsx   Desktop navigation and mobile navigation drawer
       routes.ts           Explicit route configuration
       routes/
         home.tsx          Current Library page, loader, action, and UI
-        sprints.tsx       Sprint creation and browsing page, loader, action, and UI
+        sprints.tsx       Sprint lifecycle and Material selection page, loader, action, and UI
       app.css             Global application styles
 packages/
   core/                   Domain operations and PostgreSQL persistence
@@ -29,6 +31,10 @@ packages/
       sprint-operations.ts
                           Sprint calendar rules and database operations
       sprint-operations.test.ts
+      sprint-material-operations.ts
+                          Sprint membership rules and persistence
+      sprint-material-selection.ts
+                          Shared selected-only tree projection
     drizzle/              Database migrations
 docker/                   Local infrastructure configuration
 docs/                     Product, architecture, workflow, and engineering docs
@@ -68,9 +74,10 @@ route-specific behavior. Keep behavior close to its only caller while the
 surface is small; extract it when reuse or complexity makes that a clearer
 interface.
 
-`root.tsx` defines the HTML document and renders the matched route through
-`<Outlet />`. `routes.ts` explicitly registers routes. The current app has one
-route, `routes/home.tsx`; folders such as `components/`, `features/`, `hooks/`,
+`root.tsx` defines the HTML document and shared navigation shell, and renders
+the matched route through `<Outlet />`. `routes.ts` explicitly registers the
+Library and Sprints routes. `components/app-sidebar.tsx` provides shared
+desktop navigation and a mobile drawer. Folders such as `features/`, `hooks/`,
 `lib/`, and `services/` do not exist yet.
 
 These are possible organizational choices, not required React Router
@@ -134,6 +141,10 @@ pattern used by other repositories.
 - Change Sprint calendar rules or persistence: start in
   `packages/core/src/sprint-operations.ts` and its tests; the page is
   `apps/local/app/routes/sprints.tsx`.
+- Change Sprint Material membership or its deletion-protection boundary: start
+  in `packages/core/src/sprint-material-operations.ts` and its tests; the
+  selection workflow is in `apps/local/app/routes/sprints.tsx`, and both saved
+  and draft selected-only trees use `sprint-material-selection.ts`.
 - Change tables or migrations: start in `packages/core/src/schema.ts` or
   `packages/core/drizzle/`; follow the repository's database workflow.
 - Change approved product behavior: consult the feature PRD before implementing

@@ -33,7 +33,9 @@ The following values define the visual baseline. Use semantic tokens rather than
 - Use panels when content genuinely needs framing; avoid nested cards and floating-card styling for every page section.
 - Long material titles must wrap or truncate with access to the full name. They must not obscure actions or make controls shift.
 - On narrow screens, preserve hierarchy and all core actions. Wide Sprint Reports may scroll within their own table region rather than forcing the whole page to overflow.
-- Initial screens should present the usable practice workflow, not a promotional landing page. Navigation structure remains a design task, not an assumed product requirement.
+- Initial screens should present the usable practice workflow, not a promotional landing page.
+- Use a persistent left sidebar for Library and Sprints on desktop, with active-route indication. At narrow widths, use a keyboard-accessible navigation drawer rather than reducing the content to a narrow column. Course Video Manager is a visual reference, not a source of product workflows.
+- Edit Sprint plans and refine membership in right-side modal dialogs, not inline rows. Keep native focus containment, Escape dismissal with dirty-draft protection, and focus return to the opening control.
 
 ## Controls And States
 

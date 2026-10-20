@@ -43,6 +43,13 @@
       "when": 1792110930389,
       "tag": "0005_add_sprint_version",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792118500613,
+      "tag": "0006_add_sprint_material_membership",
+      "breakpoints": true
     }
   ]
 }

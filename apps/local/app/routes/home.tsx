@@ -747,9 +747,6 @@ export default function Home() {
             <p className="page-context">Practice Planner</p>
             <h1>Library</h1>
           </div>
-          <Link className="button button-secondary" to="/sprints">
-            Sprints
-          </Link>
           <p className="material-count" aria-live="polite">
             {materialCount} {materialCount === 1 ? "Material" : "Materials"}
           </p>
