@@ -18,7 +18,7 @@ Status: product planning has been reset for feature-by-feature discovery. The ar
 
 ## Features
 
-The first Material management slice is implemented: standalone Material can be added to the Library, renamed, and found by title search with its hierarchy context. The Library also browses standalone Material in 20-root pages while keeping each root's subtree together. Story #24 adds calendar Sprint creation and browsing with timezone-based lifecycle status; Story #25 adds status-aware Sprint editing with stale-edit protection; selection, deferral, and deletion remain future work. See the [Material management PRD](docs/features/material-management.md), [pagination specification](docs/features/library-pagination.md), [Sprint planning PRD](docs/features/sprint-planning.md), and [GitHub implementation issues](https://github.com/hady-salhab93/Practice-Planner/issues/9).
+The first Material management slice is implemented: standalone Material can be added to the Library, renamed, and found by title search with its hierarchy context. The Library also browses standalone Material in 20-root pages while keeping each root's subtree together. Sprint creation, browsing, and status-aware editing are implemented. Story #26 adds persisted Material selection and refinement for future and current Sprints; deferral and deletion remain future work. See the [Material management PRD](docs/features/material-management.md), [pagination specification](docs/features/library-pagination.md), [Sprint planning PRD](docs/features/sprint-planning.md), and [GitHub implementation issues](https://github.com/hady-salhab93/Practice-Planner/issues/9).
 
 ## Getting Started
 
@@ -40,7 +40,7 @@ The local app runs at the URL printed by React Router. PostgreSQL runs in Docker
 
 ## Usage
 
-The Library supports adding and renaming standalone Material, case-insensitive title search across the saved hierarchy, and browsing standalone Material in 20-root pages with nested context intact. Page navigation is represented in the URL, and search results show their ancestor paths and open the selected Material in context. The Sprints page creates and browses calendar Sprints, persists the initial device timezone, and derives future/current/past status from that timezone. Sprint Material selection and other product workflows remain future work.
+The sidebar provides Library and Sprint navigation, with a navigation drawer on narrow screens. The Library supports adding and renaming standalone Material, case-insensitive title search across the saved hierarchy, and browsing standalone Material in 20-root pages with nested context intact. Page navigation is represented in the URL, and search results show their ancestor paths and open the selected Material in context. The Sprints page creates and browses calendar Sprints, persists the initial device timezone, and derives future/current/past status from that timezone. Sprint editing and membership refinement use side dialogs with Save/Cancel drafts. Sprint views show only selected Material; past Sprints are hidden by default and can be revealed for review. Membership persists across reloads, while past membership is read-only.
 
 ## Architecture
 

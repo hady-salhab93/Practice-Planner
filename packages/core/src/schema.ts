@@ -5,6 +5,7 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -103,3 +104,27 @@ export const sprints = pgTable(
 );
 
 export type Sprint = typeof sprints.$inferSelect;
+
+export const sprintMaterials = pgTable(
+  "sprint_materials",
+  {
+    sprintId: uuid("sprint_id")
+      .notNull()
+      .references(() => sprints.id, { onDelete: "cascade" }),
+    materialId: uuid("material_id")
+      .notNull()
+      .references(() => materials.id, { onDelete: "restrict" }),
+    selectedAt: timestamp("selected_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: "sprint_materials_pk",
+      columns: [table.sprintId, table.materialId],
+    }),
+    index("sprint_materials_material_id_idx").on(table.materialId),
+  ],
+);
+
+export type SprintMaterial = typeof sprintMaterials.$inferSelect;

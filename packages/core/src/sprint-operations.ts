@@ -4,7 +4,7 @@ import * as schema from "./schema.js";
 import { applicationSettings, sprints, type Sprint } from "./schema.js";
 
 type Database = NodePgDatabase<typeof schema>;
-type SprintStatus = "future" | "current" | "past";
+export type SprintStatus = "future" | "current" | "past";
 
 export type SprintWithStatus = Sprint & { status: SprintStatus };
 export type SprintList = {
@@ -304,7 +304,7 @@ function parseCalendarDate(value: string): string | null {
   return date.toISOString().slice(0, 10) === value ? value : null;
 }
 
-function getCalendarDateInTimeZone(now: Date, timeZone: string): string {
+export function getCalendarDateInTimeZone(now: Date, timeZone: string): string {
   if (!Number.isFinite(now.getTime()))
     throw new RangeError("Invalid current date.");
   let parts: Intl.DateTimeFormatPart[];
@@ -328,7 +328,7 @@ function getCalendarDateInTimeZone(now: Date, timeZone: string): string {
   return `${year.padStart(4, "0")}-${month}-${day}`;
 }
 
-function getSprintStatus(
+export function getSprintStatus(
   sprint: Pick<Sprint, "startDate" | "endDate">,
   today: string,
 ): SprintStatus {
