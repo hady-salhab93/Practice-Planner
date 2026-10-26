@@ -878,6 +878,35 @@ button:focus-visible,
   width: min(64rem, 100%);
 }
 
+.sprint-defer-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  max-width: 100%;
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--foreground);
+  background: var(--background);
+  box-shadow: 0 1rem 3rem oklch(0 0 0 / 24%);
+}
+
+.sprint-defer-dialog::backdrop {
+  background: oklch(0 0 0 / 45%);
+}
+
+.sprint-defer-content {
+  padding: 1.5rem;
+}
+
+.sprint-defer-content h2,
+.sprint-defer-content p {
+  margin: 0;
+}
+
+.sprint-defer-content h2 {
+  font-size: 1.1rem;
+}
+
 .sprint-panel-wide[open] {
   display: flex;
   flex-direction: column;

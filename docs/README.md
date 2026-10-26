@@ -11,8 +11,9 @@
 - [Plan and refine Sprints](features/sprint-planning.md): approved calendar
   lifecycle, Material selection/refinement, and deferral requirements for
   Feature #18, with six published Story sub-issues and explicit blockers.
-  Stories #24 and #26 are implemented; other Stories remain gated and Tag
-  filtering remains discovery-gated.
+  Stories #24 and #26 are implemented. Story #27 implementation is in place,
+  with focused browser verification outstanding; Stories #25 and #28 remain
+  gated, and Tag filtering remains discovery-gated.
 - [Library pagination](features/library-pagination.md): replacement release spec;
   sorting and moving are deferred. Server-side paging and page navigation are
   implemented; full acceptance verification remains open.

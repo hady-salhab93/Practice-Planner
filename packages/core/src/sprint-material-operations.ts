@@ -73,6 +73,36 @@ export class SprintMaterialNotFoundError extends Error {
   }
 }
 
+export class SprintMaterialNotSelectedError extends Error {
+  constructor() {
+    super("This Material is no longer selected in the source Sprint.");
+    this.name = "SprintMaterialNotSelectedError";
+  }
+}
+
+export class SprintMaterialSelectionConflictError extends Error {
+  constructor() {
+    super(
+      "The selected Material changed while confirmation was open. Refresh the selection and confirm again.",
+    );
+    this.name = "SprintMaterialSelectionConflictError";
+  }
+}
+
+export class SprintMaterialNotCurrentError extends Error {
+  constructor() {
+    super("Only a current Sprint can defer selected Material.");
+    this.name = "SprintMaterialNotCurrentError";
+  }
+}
+
+export class SprintMaterialDestinationNotFutureError extends Error {
+  constructor() {
+    super("Choose an existing future Sprint as the destination.");
+    this.name = "SprintMaterialDestinationNotFutureError";
+  }
+}
+
 export async function listSprintMaterialCollection(
   database: Database,
   options: SprintOperationOptions = {},
@@ -289,6 +319,129 @@ export async function updateSprintMaterialSelection(
         })),
       );
     }
+  });
+}
+
+export type DeferSprintMaterialInput = {
+  sourceSprintId: string;
+  materialId: string;
+  expectedMaterialIds: string[];
+  destinationSprintId?: string | null;
+};
+
+export async function deferSprintMaterialSubtree(
+  database: Database,
+  input: DeferSprintMaterialInput,
+  options: SprintOperationOptions = {},
+): Promise<number> {
+  if (
+    new Set(input.expectedMaterialIds).size !== input.expectedMaterialIds.length
+  ) {
+    throw new SprintMaterialSelectionConflictError();
+  }
+  if (input.destinationSprintId === input.sourceSprintId) {
+    throw new SprintMaterialDestinationNotFutureError();
+  }
+
+  return database.transaction(async (transaction) => {
+    await transaction.execute(sql`select pg_advisory_xact_lock(1886218352, 0)`);
+    const sprintIds = [
+      input.sourceSprintId,
+      ...(input.destinationSprintId ? [input.destinationSprintId] : []),
+    ].sort();
+    const sprintRows = await transaction
+      .select()
+      .from(sprints)
+      .where(inArray(sprints.id, sprintIds))
+      .orderBy(asc(sprints.id))
+      .for("update");
+    const sprintById = new Map(sprintRows.map((sprint) => [sprint.id, sprint]));
+    const source = sprintById.get(input.sourceSprintId);
+    if (!source) throw new SprintNotFoundError();
+    const destination = input.destinationSprintId
+      ? sprintById.get(input.destinationSprintId)
+      : undefined;
+    if (input.destinationSprintId && !destination) {
+      throw new SprintNotFoundError();
+    }
+
+    const [settings] = await transaction
+      .select({ timeZone: applicationSettings.timeZone })
+      .from(applicationSettings)
+      .where(eq(applicationSettings.id, 1))
+      .limit(1);
+    if (!settings) throw new MissingApplicationTimeZoneError();
+
+    const today = getCalendarDateInTimeZone(
+      options.now ?? new Date(),
+      settings.timeZone,
+    );
+    const sourceStatus = getSprintStatus(source, today);
+    if (sourceStatus === "past") throw new SprintMaterialLockedError();
+    if (sourceStatus !== "current") throw new SprintMaterialNotCurrentError();
+    if (destination && getSprintStatus(destination, today) !== "future") {
+      throw new SprintMaterialDestinationNotFutureError();
+    }
+
+    const [rows, memberships] = await Promise.all([
+      transaction.select().from(materials),
+      transaction
+        .select({ materialId: sprintMaterials.materialId })
+        .from(sprintMaterials)
+        .where(eq(sprintMaterials.sprintId, input.sourceSprintId)),
+    ]);
+    const materialById = new Map(
+      rows.map((material) => [material.id, material]),
+    );
+    const material = materialById.get(input.materialId);
+    if (!material) throw new SprintMaterialNotFoundError();
+
+    const childrenByParent = new Map<string, Material[]>();
+    for (const row of rows) {
+      if (row.parentId === null) continue;
+      const children = childrenByParent.get(row.parentId) ?? [];
+      children.push(row);
+      childrenByParent.set(row.parentId, children);
+    }
+    const subtreeIds = new Set<string>();
+    visitSubtree(material, childrenByParent, (descendant) =>
+      subtreeIds.add(descendant.id),
+    );
+    const currentMaterialIds = memberships
+      .map(({ materialId }) => materialId)
+      .filter((id) => subtreeIds.has(id));
+    const currentMaterialSet = new Set(currentMaterialIds);
+    const expectedMaterialSet = new Set(input.expectedMaterialIds);
+    if (!currentMaterialSet.has(input.materialId)) {
+      throw new SprintMaterialNotSelectedError();
+    }
+    if (
+      currentMaterialSet.size !== expectedMaterialSet.size ||
+      [...currentMaterialSet].some((id) => !expectedMaterialSet.has(id))
+    ) {
+      throw new SprintMaterialSelectionConflictError();
+    }
+
+    if (destination) {
+      await transaction
+        .insert(sprintMaterials)
+        .values(
+          currentMaterialIds.map((materialId) => ({
+            sprintId: destination.id,
+            materialId,
+          })),
+        )
+        .onConflictDoNothing();
+    }
+    await transaction
+      .delete(sprintMaterials)
+      .where(
+        and(
+          eq(sprintMaterials.sprintId, source.id),
+          inArray(sprintMaterials.materialId, currentMaterialIds),
+        ),
+      );
+    return currentMaterialIds.length;
   });
 }
 

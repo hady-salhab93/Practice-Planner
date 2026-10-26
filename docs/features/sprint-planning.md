@@ -156,6 +156,11 @@ planned end even when no next Sprint exists.
 - Preserve memberships elsewhere. A transfer removes source membership and
   adds destination membership together, without losing the selection if the
   destination becomes unavailable or the save fails.
+- Start deferral from selected Material in the current Sprint's Manage Material
+  dialog. A separate confirmation dialog offers an optional existing future
+  Sprint destination. If the source selection changed after the dialog opened,
+  reject the transfer, preserve the dialog, and require refreshed selection and
+  explicit reconfirmation.
 - Deferral never erases or redistributes practice already recorded against
   the selected Material.
 
@@ -194,9 +199,10 @@ duplicate local issue bodies.
 | [#29: Filter Sprint selection by Tags](https://github.com/hady-salhab93/Practice-Planner/issues/29)            | #26 and real Material classification |
 
 All six are native sub-issues of Feature #18. No `ready-for-agent` labels were
-applied. Implementation is authorized only for Story #24; the remaining
-Stories are not authorized. Naming and interaction questions remain explicit
-in the relevant Stories.
+applied. Story #24 and Story #26 were implemented under explicit
+implementation authorization. Story #27 has now been authorized; Stories #25,
+#28, and #29 remain gated. The Story #27 confirmation and stale-selection
+interaction choices are recorded under Refinement And Deferral.
 
 Tag filtering has `needs-info` and remains discovery-gated. Its classification
 implementation Story is not yet published; the
@@ -204,9 +210,10 @@ implementation Story is not yet published; the
 are a requirements source, not an actionable completed blocker. Add the native
 classification dependency when its owning Story exists.
 
-Story #24 and Story #26 are implemented under explicit user authorization.
-Story #25 and Stories #27–#29 remain gated. No prefactoring Story is justified
-by the current evidence.
+Stories #24 and #26 are implemented. Story #27 implementation is in place, but
+its focused browser verification remains outstanding. Story #25 and Stories
+#28–#29 remain gated. No prefactoring Story is justified by the current
+evidence.
 
 ## Verification Agreement
 
@@ -233,6 +240,11 @@ removal scoped to one Sprint, membership protection, archive behavior, and
 past-Sprint locking. Its route workflow was checked for subtree selection,
 Cancel, saving, reload-visible membership, and subtree removal; the editor was
 also checked at narrow dark and desktop light viewports.
+
+Story #27 adds PostgreSQL-backed checks for exact subtree transfer, removal
+without a destination, preservation of other Sprint membership, stale-selection
+rejection, and future-source rejection. Its real browser deferral workflow has
+not yet been verified.
 
 The 2026-10-17 layout adjustment was checked through the real route workflow:
 past-Sprint visibility, selected-only saved and draft trees, side-dialog Save

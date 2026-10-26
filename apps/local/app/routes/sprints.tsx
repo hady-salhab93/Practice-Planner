@@ -7,6 +7,7 @@ import {
   useSearchParams,
 } from "react-router";
 import {
+  ArrowRight,
   Check,
   ChevronRight,
   ListPlus,
@@ -33,9 +34,14 @@ import {
 } from "@practice-planner/core/sprint-operations";
 import {
   ArchivedSprintMaterialError,
+  deferSprintMaterialSubtree,
   listSprintMaterialCollection,
   SprintMaterialLockedError,
   SprintMaterialNotFoundError,
+  SprintMaterialNotCurrentError,
+  SprintMaterialNotSelectedError,
+  SprintMaterialDestinationNotFutureError,
+  SprintMaterialSelectionConflictError,
   updateSprintMaterialSelection,
   type SprintMaterialChange,
   type SprintMaterialNode,
@@ -51,6 +57,12 @@ type SprintDraft = {
   endDate: string;
 };
 
+type DeferredMaterial = {
+  materialId: string;
+  title: string;
+  expectedMaterialIds: string[];
+};
+
 type SprintActionData =
   | { ok: true; intent: "create" }
   | { ok: false; intent: "create"; message: string }
@@ -58,6 +70,14 @@ type SprintActionData =
   | { ok: false; intent: "update"; id: string; message: string }
   | { ok: true; intent: "materials"; id: string }
   | { ok: false; intent: "materials"; id: string; message: string }
+  | { ok: true; intent: "defer"; id: string; movedCount: number }
+  | {
+      ok: false;
+      intent: "defer";
+      id: string;
+      message: string;
+      refreshRequired?: boolean;
+    }
   | { ok: false; intent: "invalid"; message: string };
 
 export async function loader() {
@@ -91,6 +111,52 @@ export async function action({
         intent: "materials",
         id,
         message: getSprintErrorMessage(error),
+      };
+    }
+  }
+
+  if (formData.get("intent") === "defer") {
+    const sourceSprintId = getFormValue(formData, "id");
+    const materialId = getFormValue(formData, "materialId");
+    const expectedMaterialIds = parseUuidList(
+      getFormValue(formData, "expectedMaterialIds"),
+    );
+    const destinationSprintId =
+      getFormValue(formData, "destinationSprintId") || null;
+    if (
+      !isUuid(sourceSprintId) ||
+      !isUuid(materialId) ||
+      expectedMaterialIds === null ||
+      (destinationSprintId !== null && !isUuid(destinationSprintId))
+    ) {
+      return {
+        ok: false,
+        intent: "defer",
+        id: sourceSprintId,
+        message: "This deferral request is invalid. Reload and try again.",
+      };
+    }
+
+    try {
+      const movedCount = await deferSprintMaterialSubtree(getDatabase(), {
+        sourceSprintId,
+        materialId,
+        expectedMaterialIds,
+        destinationSprintId,
+      });
+      return { ok: true, intent: "defer", id: sourceSprintId, movedCount };
+    } catch (error) {
+      return {
+        ok: false,
+        intent: "defer",
+        id: sourceSprintId,
+        message: getSprintErrorMessage(
+          error,
+          "Could not defer this Material. Your confirmation is still here; try again.",
+        ),
+        refreshRequired:
+          error instanceof SprintMaterialSelectionConflictError ||
+          error instanceof SprintMaterialNotSelectedError,
       };
     }
   }
@@ -465,6 +531,7 @@ export default function Sprints() {
                 today={today}
                 materialTree={materialTree}
                 availableMaterials={availableMaterials}
+                sprints={sprints}
                 materialSummary={
                   plans[selectedSprint.id] ?? EMPTY_MATERIAL_SUMMARY
                 }
@@ -545,6 +612,7 @@ export default function Sprints() {
 
 type SprintRowProps = {
   sprint: SerializedSprint;
+  sprints: SerializedSprint[];
   today: string;
   materialTree: SprintMaterialNode[];
   availableMaterials: SprintMaterialNode[];
@@ -570,6 +638,7 @@ const EMPTY_MATERIAL_SUMMARY: SprintMaterialSummary = {
 
 function SprintRow({
   sprint,
+  sprints,
   today,
   materialTree,
   availableMaterials,
@@ -585,6 +654,7 @@ function SprintRow({
 }: SprintRowProps) {
   const fetcher = useFetcher<typeof action>();
   const materialFetcher = useFetcher<typeof action>();
+  const deferFetcher = useFetcher<typeof action>();
   const [draft, setDraft] = useState<SprintDraft>(() => toDraft(sprint));
   const [error, setError] = useState<string | null>(null);
   const [materialDraftIds, setMaterialDraftIds] = useState(
@@ -594,14 +664,23 @@ function SprintRow({
     SprintMaterialChange[]
   >([]);
   const [materialError, setMaterialError] = useState<string | null>(null);
+  const [deferredMaterial, setDeferredMaterial] =
+    useState<DeferredMaterial | null>(null);
+  const [destinationSprintId, setDestinationSprintId] = useState("");
+  const [deferError, setDeferError] = useState<string | null>(null);
+  const [deferSuccess, setDeferSuccess] = useState<string | null>(null);
   const submitted = useRef(false);
   const materialSubmitted = useRef(false);
+  const deferSubmitted = useRef(false);
   const panelRef = useRef<HTMLDialogElement>(null);
+  const deferDialogRef = useRef<HTMLDialogElement>(null);
   const editButtonRef = useRef<HTMLButtonElement>(null);
   const materialButtonRef = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const deferReturnFocusRef = useRef<HTMLButtonElement | null>(null);
   const isSaving = fetcher.state !== "idle";
   const isSavingMaterials = materialFetcher.state !== "idle";
+  const isDeferring = deferFetcher.state !== "idle";
   const isDirty =
     isEditing &&
     (draft.name !== sprint.name ||
@@ -612,6 +691,7 @@ function SprintRow({
     materialDraftIds,
     new Set(materialSummary.selectedMaterialIds),
   );
+  const savedMaterialIds = new Set(materialSummary.selectedMaterialIds);
   const datesLocked = sprint.status === "past";
   const startLocked = sprint.status !== "future";
   const minStart = today;
@@ -635,6 +715,17 @@ function SprintRow({
   }, [isEditing, isManagingMaterials]);
 
   useEffect(() => {
+    const dialog = deferDialogRef.current;
+    if (!dialog) return;
+    if (deferredMaterial && !dialog.open) dialog.showModal();
+    if (!deferredMaterial && dialog.open) {
+      dialog.close();
+      deferReturnFocusRef.current?.focus();
+      deferReturnFocusRef.current = null;
+    }
+  }, [deferredMaterial]);
+
+  useEffect(() => {
     if (fetcher.state !== "idle" || !submitted.current) return;
     submitted.current = false;
     const data = fetcher.data;
@@ -652,6 +743,37 @@ function SprintRow({
     else setMaterialError(data.message);
   }, [materialFetcher.data, materialFetcher.state, onClose, sprint.id]);
 
+  useEffect(() => {
+    if (deferFetcher.state !== "idle" || !deferSubmitted.current) return;
+    deferSubmitted.current = false;
+    const data = deferFetcher.data;
+    if (data?.intent !== "defer" || data.id !== sprint.id) return;
+    if (data.ok) {
+      const movedIds = new Set(deferredMaterial?.expectedMaterialIds ?? []);
+      setMaterialDraftIds(
+        (ids) =>
+          new Set([...ids].filter((materialId) => !movedIds.has(materialId))),
+      );
+      setMaterialChanges([]);
+      setMaterialError(null);
+      setDeferSuccess(
+        destinationSprintId
+          ? `Deferred ${data.movedCount} selected Material ${data.movedCount === 1 ? "item" : "items"} to the future Sprint.`
+          : `Removed ${data.movedCount} selected Material ${data.movedCount === 1 ? "item" : "items"} from this Sprint.`,
+      );
+      setDeferError(null);
+      setDeferredMaterial(null);
+    } else {
+      setDeferError(data.message);
+    }
+  }, [
+    deferFetcher.data,
+    deferFetcher.state,
+    deferredMaterial,
+    destinationSprintId,
+    sprint.id,
+  ]);
+
   function open() {
     returnFocusRef.current = editButtonRef.current;
     setDraft(toDraft(sprint));
@@ -664,7 +786,49 @@ function SprintRow({
     setMaterialDraftIds(new Set(materialSummary.selectedMaterialIds));
     setMaterialChanges([]);
     setMaterialError(null);
+    setDeferSuccess(null);
     onManageMaterials();
+  }
+
+  function openDeferral(materialId: string, button: HTMLButtonElement) {
+    const material = findSprintMaterial(materialTree, materialId);
+    if (!material || isSavingMaterials || materialIsDirty) return;
+    deferReturnFocusRef.current = button;
+    setDeferSuccess(null);
+    setDeferredMaterial({
+      materialId,
+      title: material.title,
+      expectedMaterialIds: getSubtreeIds(material).filter((id) =>
+        savedMaterialIds.has(id),
+      ),
+    });
+    setDestinationSprintId("");
+    setDeferError(null);
+  }
+
+  function refreshDeferralSelection() {
+    if (!deferredMaterial) return;
+    const selected = findSprintMaterial(
+      materialSummary.selectedMaterials,
+      deferredMaterial.materialId,
+    );
+    setMaterialDraftIds(new Set(materialSummary.selectedMaterialIds));
+    setMaterialChanges([]);
+    if (!selected) {
+      setDeferredMaterial({
+        ...deferredMaterial,
+        expectedMaterialIds: [],
+      });
+      setDeferError(
+        "This Material is no longer selected in the Sprint. Close this confirmation and review the updated selection.",
+      );
+      return;
+    }
+    setDeferredMaterial({
+      ...deferredMaterial,
+      expectedMaterialIds: getSubtreeIds(selected),
+    });
+    setDeferError("Selection refreshed. Review it and confirm again.");
   }
 
   function selectMaterial(materialId: string) {
@@ -680,6 +844,7 @@ function SprintRow({
       { type: "select", materialId },
     ]);
     setMaterialError(null);
+    setDeferSuccess(null);
   }
 
   function removeMaterial(materialId: string) {
@@ -695,6 +860,7 @@ function SprintRow({
       { type: "remove", materialId },
     ]);
     setMaterialError(null);
+    setDeferSuccess(null);
   }
 
   function update(field: keyof SprintDraft, value: string) {
@@ -703,7 +869,7 @@ function SprintRow({
   }
 
   function requestClose() {
-    if (isSaving || isSavingMaterials) return;
+    if (isSaving || isSavingMaterials || isDeferring) return;
     if (
       (isDirty || (isManagingMaterials && materialIsDirty)) &&
       !window.confirm("Discard your unsaved Sprint changes?")
@@ -772,7 +938,7 @@ function SprintRow({
             type="button"
             aria-label="Close Sprint dialog"
             title="Close"
-            disabled={isSaving || isSavingMaterials}
+            disabled={isSaving || isSavingMaterials || isDeferring}
             onClick={requestClose}
           >
             <X aria-hidden="true" size={16} />
@@ -924,6 +1090,10 @@ function SprintRow({
                       selectedIds={materialDraftIds}
                       mode="selected"
                       disabled={isSavingMaterials}
+                      canDefer={!materialIsDirty}
+                      onDefer={
+                        sprint.status === "current" ? openDeferral : undefined
+                      }
                       onSelect={selectMaterial}
                       onRemove={removeMaterial}
                     />
@@ -934,6 +1104,17 @@ function SprintRow({
             {materialError && (
               <p className="form-error" role="alert">
                 {materialError}
+              </p>
+            )}
+            {deferSuccess && (
+              <p className="sprint-timezone" role="status">
+                {deferSuccess}
+              </p>
+            )}
+            {sprint.status === "current" && materialIsDirty && (
+              <p className="sprint-timezone">
+                Save or cancel Material changes before deferring selected
+                Material.
               </p>
             )}
             <materialFetcher.Form
@@ -974,6 +1155,140 @@ function SprintRow({
           </section>
         ) : null}
       </dialog>
+      <dialog
+        ref={deferDialogRef}
+        className="sprint-defer-dialog"
+        aria-labelledby={`defer-material-heading-${sprint.id}`}
+        onCancel={(event) => {
+          event.preventDefault();
+          if (!isDeferring) setDeferredMaterial(null);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          if (!isDeferring) setDeferredMaterial(null);
+        }}
+      >
+        <div className="sprint-defer-content sprint-form">
+          <h2 id={`defer-material-heading-${sprint.id}`}>
+            Defer selected Material
+          </h2>
+          {deferredMaterial && (
+            <>
+              <p>
+                Remove <strong>{deferredMaterial.title}</strong>
+                {deferredMaterial.expectedMaterialIds.length > 1
+                  ? ` and its ${deferredMaterial.expectedMaterialIds.length - 1} selected descendant${deferredMaterial.expectedMaterialIds.length === 2 ? "" : "s"}`
+                  : ""}
+                {` from ${sprint.name}`}
+                {destinationSprintId
+                  ? " and add those selected items to the chosen future Sprint."
+                  : ". The Material will remain available in the Library."}
+              </p>
+              <label htmlFor={`defer-destination-${sprint.id}`}>
+                Future Sprint (optional)
+              </label>
+              <select
+                id={`defer-destination-${sprint.id}`}
+                value={destinationSprintId}
+                disabled={isDeferring}
+                onChange={(event) => setDestinationSprintId(event.target.value)}
+              >
+                <option value="">No destination</option>
+                {destinationSprintId &&
+                  !sprints.some(
+                    (candidate) =>
+                      candidate.id === destinationSprintId &&
+                      candidate.status === "future",
+                  ) && (
+                    <option value={destinationSprintId} disabled>
+                      {sprints.find(
+                        (candidate) => candidate.id === destinationSprintId,
+                      )?.name ?? "Selected Sprint"}{" "}
+                      (no longer future)
+                    </option>
+                  )}
+                {sprints
+                  .filter(
+                    (candidate) =>
+                      candidate.id !== sprint.id &&
+                      candidate.status === "future",
+                  )
+                  .map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.name}
+                    </option>
+                  ))}
+              </select>
+              {deferError && (
+                <p className="form-error" role="alert">
+                  {deferError}
+                </p>
+              )}
+              <deferFetcher.Form
+                className="sprint-form-actions"
+                method="post"
+                onSubmit={(event) => {
+                  if (deferSubmitted.current) {
+                    event.preventDefault();
+                    return;
+                  }
+                  deferSubmitted.current = true;
+                  setDeferError(null);
+                }}
+              >
+                <input type="hidden" name="intent" value="defer" />
+                <input type="hidden" name="id" value={sprint.id} />
+                <input
+                  type="hidden"
+                  name="materialId"
+                  value={deferredMaterial.materialId}
+                />
+                <input
+                  type="hidden"
+                  name="expectedMaterialIds"
+                  value={JSON.stringify(deferredMaterial.expectedMaterialIds)}
+                />
+                <input
+                  type="hidden"
+                  name="destinationSprintId"
+                  value={destinationSprintId}
+                />
+                {deferFetcher.data?.intent === "defer" &&
+                  !deferFetcher.data.ok &&
+                  deferFetcher.data.refreshRequired && (
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      disabled={isDeferring}
+                      onClick={refreshDeferralSelection}
+                    >
+                      Refresh selection
+                    </button>
+                  )}
+                <button
+                  className="button button-primary"
+                  type="submit"
+                  disabled={
+                    isDeferring ||
+                    deferredMaterial.expectedMaterialIds.length === 0
+                  }
+                >
+                  {isDeferring ? "Deferring..." : "Confirm deferral"}
+                </button>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  disabled={isDeferring}
+                  onClick={() => setDeferredMaterial(null)}
+                >
+                  Cancel
+                </button>
+              </deferFetcher.Form>
+            </>
+          )}
+        </div>
+      </dialog>
       <>
         <p className="sprint-dates">
           <time dateTime={sprint.startDate}>{sprint.startDate}</time>
@@ -1011,8 +1326,10 @@ type SprintMaterialTreeProps = {
   selectedIds: Set<string>;
   mode: "available" | "selected" | "summary";
   disabled?: boolean;
+  canDefer?: boolean;
   onSelect?: (materialId: string) => void;
   onRemove?: (materialId: string) => void;
+  onDefer?: (materialId: string, button: HTMLButtonElement) => void;
 };
 
 function SprintMaterialTree({
@@ -1020,8 +1337,10 @@ function SprintMaterialTree({
   selectedIds,
   mode,
   disabled = false,
+  canDefer = false,
   onSelect,
   onRemove,
+  onDefer,
 }: SprintMaterialTreeProps) {
   const treeId = useId();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
@@ -1081,16 +1400,36 @@ function SprintMaterialTree({
                 )
               ) : mode === "selected" ? (
                 isSelected ? (
-                  <button
-                    className="material-disclosure sprint-material-action sprint-material-remove"
-                    type="button"
-                    disabled={disabled}
-                    aria-label={`Remove ${material.title} from Sprint`}
-                    title="Remove from Sprint"
-                    onClick={() => onRemove?.(material.id)}
-                  >
-                    <Trash2 aria-hidden="true" size={16} />
-                  </button>
+                  <>
+                    <button
+                      className="material-disclosure sprint-material-action sprint-material-remove"
+                      type="button"
+                      disabled={disabled}
+                      aria-label={`Remove ${material.title} from Sprint`}
+                      title="Remove from Sprint"
+                      onClick={() => onRemove?.(material.id)}
+                    >
+                      <Trash2 aria-hidden="true" size={16} />
+                    </button>
+                    {onDefer && (
+                      <button
+                        className="material-disclosure sprint-material-action"
+                        type="button"
+                        disabled={disabled || !canDefer}
+                        aria-label={`Defer ${material.title}`}
+                        title={
+                          canDefer
+                            ? "Defer selected subtree"
+                            : "Save or cancel Material changes before deferring"
+                        }
+                        onClick={(event) =>
+                          onDefer(material.id, event.currentTarget)
+                        }
+                      >
+                        <ArrowRight aria-hidden="true" size={16} />
+                      </button>
+                    )}
+                  </>
                 ) : null
               ) : null}
             </div>
@@ -1102,8 +1441,10 @@ function SprintMaterialTree({
                     selectedIds={selectedIds}
                     mode={mode}
                     disabled={disabled}
+                    canDefer={canDefer}
                     onSelect={onSelect}
                     onRemove={onRemove}
+                    onDefer={onDefer}
                   />
                 )}
               </div>
@@ -1166,7 +1507,10 @@ function getFormValue(formData: FormData, name: string): string {
   return typeof value === "string" ? value : "";
 }
 
-function getSprintErrorMessage(error: unknown): string {
+function getSprintErrorMessage(
+  error: unknown,
+  fallback = "Could not save this Sprint. Your input is still here; try again.",
+): string {
   if (error instanceof InvalidSprintNameError) return error.message;
   if (error instanceof InvalidSprintDateError) return error.message;
   if (error instanceof SprintStartDateInPastError) return error.message;
@@ -1180,7 +1524,35 @@ function getSprintErrorMessage(error: unknown): string {
   if (error instanceof ArchivedSprintMaterialError) return error.message;
   if (error instanceof SprintMaterialLockedError) return error.message;
   if (error instanceof SprintMaterialNotFoundError) return error.message;
-  return "Could not save this Sprint. Your input is still here; try again.";
+  if (error instanceof SprintMaterialNotCurrentError) return error.message;
+  if (error instanceof SprintMaterialNotSelectedError) return error.message;
+  if (error instanceof SprintMaterialDestinationNotFutureError)
+    return error.message;
+  if (error instanceof SprintMaterialSelectionConflictError)
+    return error.message;
+  return fallback;
+}
+
+function isUuid(value: string): boolean {
+  return /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(value);
+}
+
+function parseUuidList(serialized: string): string[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(serialized);
+  } catch {
+    return null;
+  }
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every(
+      (value): value is string => typeof value === "string" && isUuid(value),
+    )
+  ) {
+    return null;
+  }
+  return parsed;
 }
 
 function parseSprintMaterialChanges(
