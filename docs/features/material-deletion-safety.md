@@ -118,18 +118,19 @@ not completion.
 **Outcome:** select a current subtree for a real Sprint, explicitly include new
 descendants, and defer a selected subtree without changing the Library.
 
-**Status:** Story #26 now persists selection/refinement and exposes real
-membership protection. Destination deferral remains unimplemented.
+**Status:** Story #26 persists selection/refinement. Story #27 adds persisted
+destination deferral with real Sprint membership protection; focused browser
+verification remains outstanding.
 
 **Acceptance:** membership survives reload; optional future assignment produces
 real membership; removal clears only the removed membership's protection;
 other and ended-Sprint memberships remain protective; archived Material remains
 accessible from existing Sprint context.
 
-**Dependencies:** Stories #24 and #26 are implemented; Story #27 remains gated
-for destination deferral. The PRD establishes creation, calendar lifecycle,
-membership, and destination behavior. This does not require Tag filtering or
-the full Sprint review UI.
+**Dependencies:** Stories #24 and #26 are implemented. Story #27 has persisted
+deferral behavior with focused browser verification outstanding. The PRD
+establishes creation, calendar lifecycle, membership, and destination behavior.
+This does not require Tag filtering or the full Sprint review UI.
 
 ### 2. Persist And Correct Practice Records
 

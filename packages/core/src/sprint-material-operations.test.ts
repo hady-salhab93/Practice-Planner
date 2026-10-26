@@ -14,10 +14,13 @@ import {
 import { createSprint, listSprints } from "./sprint-operations.js";
 import {
   ArchivedSprintMaterialError,
+  deferSprintMaterialSubtree,
   listSprintMaterialCollection,
   listSprintMaterialPlan,
   hasSprintMaterialMembership,
   SprintMaterialLockedError,
+  SprintMaterialNotCurrentError,
+  SprintMaterialSelectionConflictError,
   updateSprintMaterialSelection,
 } from "./sprint-material-operations.js";
 import * as schema from "./schema.js";
@@ -274,6 +277,287 @@ describe("Sprint Material operations", () => {
     expect(await hasSprintMaterialMembership(database, child.id)).toBe(false);
   });
 
+  it("transfers only the current Sprint's selected subtree to a future Sprint", async () => {
+    const { startDate, endDate } = await getSprintDates(database);
+    const now = await getInstantForCalendarDate(database, startDate);
+    const root = await createStandaloneMaterial(
+      database,
+      `Deferral root ${crypto.randomUUID()}`,
+    );
+    const selected = await createChildMaterial(
+      database,
+      root.id,
+      `Deferral selection ${crypto.randomUUID()}`,
+    );
+    const selectedChild = await createChildMaterial(
+      database,
+      selected.id,
+      `Deferral selected child ${crypto.randomUUID()}`,
+    );
+    const excludedSibling = await createChildMaterial(
+      database,
+      root.id,
+      `Deferral excluded sibling ${crypto.randomUUID()}`,
+    );
+    const other = await createStandaloneMaterial(
+      database,
+      `Deferral other selection ${crypto.randomUUID()}`,
+    );
+    const source = await createSprint(
+      database,
+      {
+        name: `Deferral source ${crypto.randomUUID()}`,
+        startDate,
+        endDate,
+        deviceTimeZone: "UTC",
+      },
+      { now },
+    );
+    const destination = await createSprint(
+      database,
+      {
+        name: `Deferral destination ${crypto.randomUUID()}`,
+        startDate: addDays(endDate, 1),
+        endDate: addDays(endDate, 7),
+        deviceTimeZone: "UTC",
+      },
+      { now },
+    );
+    const otherSprint = await createSprint(
+      database,
+      {
+        name: `Deferral other Sprint ${crypto.randomUUID()}`,
+        startDate: addDays(endDate, 8),
+        endDate: addDays(endDate, 14),
+        deviceTimeZone: "UTC",
+      },
+      { now },
+    );
+    await updateSprintMaterialSelection(
+      database,
+      source.id,
+      [
+        { type: "select", materialId: selected.id },
+        { type: "select", materialId: other.id },
+      ],
+      { now },
+    );
+    await updateSprintMaterialSelection(
+      database,
+      otherSprint.id,
+      [{ type: "select", materialId: selected.id }],
+      { now },
+    );
+    const sourcePlan = await listSprintMaterialPlan(database, source.id, {
+      now,
+    });
+
+    await deferSprintMaterialSubtree(
+      database,
+      {
+        sourceSprintId: source.id,
+        materialId: selected.id,
+        expectedMaterialIds: [selected.id, selectedChild.id],
+        destinationSprintId: destination.id,
+      },
+      { now },
+    );
+
+    const updatedSource = await listSprintMaterialPlan(database, source.id, {
+      now,
+    });
+    const updatedDestination = await listSprintMaterialPlan(
+      database,
+      destination.id,
+      { now },
+    );
+    expect(sourcePlan.selectedMaterialIds).toEqual(
+      expect.arrayContaining([selected.id, selectedChild.id, other.id]),
+    );
+    expect(updatedSource.selectedMaterialIds).toEqual([other.id]);
+    expect(updatedDestination.selectedMaterialIds).toEqual(
+      expect.arrayContaining([selected.id, selectedChild.id]),
+    );
+    expect(updatedDestination.selectedMaterialIds).toHaveLength(2);
+    expect(updatedDestination.selectedMaterialIds).not.toContain(
+      excludedSibling.id,
+    );
+    expect(await hasSprintMaterialMembership(database, selected.id)).toBe(true);
+    const updatedLibrary = await listLibraryMaterialTree(database);
+    expect(
+      updatedLibrary
+        .find((material) => material.id === root.id)
+        ?.children.map((child) => child.id),
+    ).toEqual([selected.id, excludedSibling.id]);
+  });
+
+  it("removes a selected subtree when deferral has no destination", async () => {
+    const { startDate, endDate } = await getSprintDates(database);
+    const now = await getInstantForCalendarDate(database, startDate);
+    const root = await createStandaloneMaterial(
+      database,
+      `Deferral removal ${crypto.randomUUID()}`,
+    );
+    const child = await createChildMaterial(
+      database,
+      root.id,
+      `Deferral removal child ${crypto.randomUUID()}`,
+    );
+    const other = await createStandaloneMaterial(
+      database,
+      `Deferral retained ${crypto.randomUUID()}`,
+    );
+    const source = await createSprint(
+      database,
+      {
+        name: `Deferral removal source ${crypto.randomUUID()}`,
+        startDate,
+        endDate,
+        deviceTimeZone: "UTC",
+      },
+      { now },
+    );
+    await updateSprintMaterialSelection(
+      database,
+      source.id,
+      [
+        { type: "select", materialId: root.id },
+        { type: "select", materialId: other.id },
+      ],
+      { now },
+    );
+
+    await deferSprintMaterialSubtree(
+      database,
+      {
+        sourceSprintId: source.id,
+        materialId: root.id,
+        expectedMaterialIds: [root.id, child.id],
+      },
+      { now },
+    );
+
+    expect(
+      (await listSprintMaterialPlan(database, source.id, { now }))
+        .selectedMaterialIds,
+    ).toEqual([other.id]);
+    expect(await hasSprintMaterialMembership(database, root.id)).toBe(false);
+    expect(await hasSprintMaterialMembership(database, child.id)).toBe(false);
+  });
+
+  it("rejects deferral from a future Sprint", async () => {
+    const now = new Date("2200-01-01T12:00:00.000Z");
+    const { startDate, endDate } = await getSprintDates(database);
+    const material = await createStandaloneMaterial(
+      database,
+      `Future deferral ${crypto.randomUUID()}`,
+    );
+    const source = await createSprint(
+      database,
+      {
+        name: `Future deferral source ${crypto.randomUUID()}`,
+        startDate,
+        endDate,
+        deviceTimeZone: "UTC",
+      },
+      { now },
+    );
+    await updateSprintMaterialSelection(
+      database,
+      source.id,
+      [{ type: "select", materialId: material.id }],
+      { now },
+    );
+
+    await expect(
+      deferSprintMaterialSubtree(
+        database,
+        {
+          sourceSprintId: source.id,
+          materialId: material.id,
+          expectedMaterialIds: [material.id],
+        },
+        { now },
+      ),
+    ).rejects.toBeInstanceOf(SprintMaterialNotCurrentError);
+    expect(await hasSprintMaterialMembership(database, material.id)).toBe(true);
+  });
+
+  it("rejects stale deferral confirmation without changing membership", async () => {
+    const { startDate, endDate } = await getSprintDates(database);
+    const now = await getInstantForCalendarDate(database, startDate);
+    const root = await createStandaloneMaterial(
+      database,
+      `Stale deferral ${crypto.randomUUID()}`,
+    );
+    const child = await createChildMaterial(
+      database,
+      root.id,
+      `Stale deferral child ${crypto.randomUUID()}`,
+    );
+    const source = await createSprint(
+      database,
+      {
+        name: `Stale deferral source ${crypto.randomUUID()}`,
+        startDate,
+        endDate,
+        deviceTimeZone: "UTC",
+      },
+      { now },
+    );
+    const destination = await createSprint(
+      database,
+      {
+        name: `Stale deferral destination ${crypto.randomUUID()}`,
+        startDate: addDays(endDate, 1),
+        endDate: addDays(endDate, 7),
+        deviceTimeZone: "UTC",
+      },
+      { now },
+    );
+    await updateSprintMaterialSelection(
+      database,
+      source.id,
+      [{ type: "select", materialId: root.id }],
+      { now },
+    );
+    const expectedMaterialIds = (
+      await listSprintMaterialPlan(database, source.id, { now })
+    ).selectedMaterialIds;
+    const addedChild = await createChildMaterial(
+      database,
+      root.id,
+      `Stale deferral newly added ${crypto.randomUUID()}`,
+    );
+    await updateSprintMaterialSelection(
+      database,
+      source.id,
+      [{ type: "select", materialId: addedChild.id }],
+      { now },
+    );
+
+    await expect(
+      deferSprintMaterialSubtree(
+        database,
+        {
+          sourceSprintId: source.id,
+          materialId: root.id,
+          expectedMaterialIds,
+          destinationSprintId: destination.id,
+        },
+        { now },
+      ),
+    ).rejects.toBeInstanceOf(SprintMaterialSelectionConflictError);
+    expect(
+      (await listSprintMaterialPlan(database, source.id, { now }))
+        .selectedMaterialIds,
+    ).toEqual(expect.arrayContaining([root.id, child.id, addedChild.id]));
+    expect(
+      (await listSprintMaterialPlan(database, destination.id, { now }))
+        .selectedMaterialIds,
+    ).toEqual([]);
+  });
+
   it("requires restoring an archived root for new selection and preserves existing membership", async () => {
     const now = new Date("2200-01-01T12:00:00.000Z");
     const { startDate, endDate } = await getSprintDates(database);
@@ -376,6 +660,45 @@ async function getSprintDates(database: NodePgDatabase<typeof schema>) {
     }
   }
   return { startDate, endDate: addDays(startDate, 6) };
+}
+
+async function getInstantForCalendarDate(
+  database: NodePgDatabase<typeof schema>,
+  date: string,
+): Promise<Date> {
+  const { timeZone } = await listSprints(database);
+  if (!timeZone) throw new Error("The test application timezone is missing.");
+  const [year, month, day] = date.split("-").map(Number);
+  const target = Date.UTC(year!, month! - 1, day!, 12);
+  let instant = target;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const parts = new Map(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23",
+      })
+        .formatToParts(new Date(instant))
+        .map(({ type, value }) => [type, value]),
+    );
+    const localAsUtc = Date.UTC(
+      Number(parts.get("year")),
+      Number(parts.get("month")) - 1,
+      Number(parts.get("day")),
+      Number(parts.get("hour")),
+      Number(parts.get("minute")),
+      Number(parts.get("second")),
+    );
+    const difference = target - localAsUtc;
+    instant += difference;
+    if (difference === 0) break;
+  }
+  return new Date(instant);
 }
 
 function addDays(date: string, count: number): string {
