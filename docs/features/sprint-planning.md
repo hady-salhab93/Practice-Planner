@@ -16,8 +16,8 @@ This PRD records the discovery agreement confirmed on 2026-10-15 for
 The user approved Story publication on 2026-10-15; GitHub owns the published
 backlog linked below. Story #24 was implemented first; Story #26 was explicitly
 authorized by an implementation task on 2026-10-16 and is now implemented.
-The remaining Stories are still gated, and no behavior from those slices is
-claimed as implemented.
+Story #28 was authorized on 2026-10-28 and is now implemented. Other Stories
+retain the delivery and approval status recorded below.
 
 Use the [glossary](../../GLOSSARY.md) for Material and Library terminology.
 The [Material management PRD](material-management.md) owns Library behavior;
@@ -200,9 +200,11 @@ duplicate local issue bodies.
 
 All six are native sub-issues of Feature #18. No `ready-for-agent` labels were
 applied. Story #24 and Story #26 were implemented under explicit
-implementation authorization. Story #27 has now been authorized; Stories #25,
-#28, and #29 remain gated. The Story #27 confirmation and stale-selection
-interaction choices are recorded under Refinement And Deferral.
+implementation authorization. Story #27 has now been authorized; Stories #25
+and #29 remain gated. Story #28 was authorized by the next-available-issue
+implementation request on 2026-10-28 and is now implemented. The Story #27
+confirmation and stale-selection interaction choices are recorded under
+Refinement And Deferral.
 
 Tag filtering has `needs-info` and remains discovery-gated. Its classification
 implementation Story is not yet published; the
@@ -211,9 +213,9 @@ are a requirements source, not an actionable completed blocker. Add the native
 classification dependency when its owning Story exists.
 
 Stories #24 and #26 are implemented. Story #27 implementation is in place, but
-its focused browser verification remains outstanding. Story #25 and Stories
-#28–#29 remain gated. No prefactoring Story is justified by the current
-evidence.
+its focused browser verification remains outstanding. Stories #25 and #29
+remain gated; Story #28 is implemented and verified. No prefactoring Story is
+justified by the current evidence.
 
 ## Verification Agreement
 
@@ -251,6 +253,19 @@ past-Sprint visibility, selected-only saved and draft trees, side-dialog Save
 and Cancel, recoverable validation errors, dirty-dismiss confirmation, keyboard
 focus containment and restoration, and mobile navigation. Panel bounds and
 horizontal overflow were checked at narrow and desktop widths in both themes.
+
+Story #28 adds public PostgreSQL-backed checks for future-Sprint deletion,
+membership cleanup, preservation of Library Material and other Sprint
+memberships, and current/past rejection at the saved-timezone date boundary.
+Browser verification covered confirmation scope, Cancel with saved membership,
+reload, deletion, preservation of another Sprint's shared membership, initial
+focus, Tab containment, Escape dismissal, and long names at desktop and narrow
+widths in both themes. A current Sprint's confirmation was opened directly to
+exercise the real server rejection and retained error context; the actual
+future-to-current transition is verified by the controlled-clock core test.
+The temporary browser Sprint and its membership were removed. Practice
+persistence does not exist yet, so practice-integrity verification remains
+unclaimed; this change adds no practice schema or deletion operation.
 
 ## Cross-Feature Gates And Remaining Questions
 

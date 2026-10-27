@@ -575,6 +575,12 @@ button:focus-visible,
   background: var(--background);
 }
 
+.button-danger {
+  color: var(--destructive);
+  border-color: var(--destructive);
+  background: var(--background);
+}
+
 .library-section {
   padding-top: 1.75rem;
 }
@@ -905,6 +911,10 @@ button:focus-visible,
 
 .sprint-defer-content h2 {
   font-size: 1.1rem;
+}
+
+.sprint-delete-dialog p {
+  overflow-wrap: anywhere;
 }
 
 .sprint-panel-wide[open] {

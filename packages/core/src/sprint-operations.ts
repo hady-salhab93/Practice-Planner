@@ -249,6 +249,44 @@ export async function updateSprint(
   });
 }
 
+export class SprintNotFutureError extends Error {
+  constructor() {
+    super(
+      "Only a future Sprint can be deleted. This Sprint is now current or past. Reload to see its latest status.",
+    );
+    this.name = "SprintNotFutureError";
+  }
+}
+
+export async function deleteSprint(
+  database: Database,
+  sprintId: string,
+  options: SprintOperationOptions = {},
+): Promise<void> {
+  await database.transaction(async (transaction) => {
+    const [existing] = await transaction
+      .select()
+      .from(sprints)
+      .where(eq(sprints.id, sprintId))
+      .for("update");
+    if (!existing) throw new SprintNotFoundError();
+    const [settings] = await transaction
+      .select({ timeZone: applicationSettings.timeZone })
+      .from(applicationSettings)
+      .where(eq(applicationSettings.id, 1))
+      .limit(1);
+    if (!settings) throw new MissingApplicationTimeZoneError();
+    const today = getCalendarDateInTimeZone(
+      options.now ?? new Date(),
+      settings.timeZone,
+    );
+    if (getSprintStatus(existing, today) !== "future") {
+      throw new SprintNotFutureError();
+    }
+    await transaction.delete(sprints).where(eq(sprints.id, sprintId));
+  });
+}
+
 export async function listSprints(
   database: Database,
   options: SprintOperationOptions = {},

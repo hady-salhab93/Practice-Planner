@@ -7,10 +7,20 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   createSprint,
+  deleteSprint,
   listSprints,
   SprintDateOverlapError,
   updateSprint,
 } from "./sprint-operations.js";
+import {
+  createStandaloneMaterial,
+  listLibraryMaterialTree,
+} from "./material-operations.js";
+import {
+  hasSprintMaterialMembership,
+  listSprintMaterialPlan,
+  updateSprintMaterialSelection,
+} from "./sprint-material-operations.js";
 import * as schema from "./schema.js";
 
 config({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
@@ -45,6 +55,116 @@ describe("Sprint operations", () => {
 
   afterAll(async () => {
     await pool?.end();
+  });
+
+  it("deletes a future Sprint and only its memberships while preserving Library Material", async () => {
+    const now = new Date("2090-01-01T12:00:00.000Z");
+    const startDate = getFutureDate();
+    const deleted = await createSprintForDates(
+      database,
+      startDate,
+      startDate,
+      now,
+    );
+    const retainedDate = addDays(startDate, 2);
+    const retained = await createSprintForDates(
+      database,
+      retainedDate,
+      retainedDate,
+      now,
+    );
+    const shared = await createStandaloneMaterial(
+      database,
+      `Shared ${crypto.randomUUID()}`,
+    );
+    const exclusive = await createStandaloneMaterial(
+      database,
+      `Exclusive ${crypto.randomUUID()}`,
+    );
+    await updateSprintMaterialSelection(
+      database,
+      deleted.id,
+      [
+        { type: "select", materialId: shared.id },
+        { type: "select", materialId: exclusive.id },
+      ],
+      { now },
+    );
+    await updateSprintMaterialSelection(
+      database,
+      retained.id,
+      [{ type: "select", materialId: shared.id }],
+      { now },
+    );
+    const libraryBefore = await listLibraryMaterialTree(database);
+
+    await deleteSprint(database, deleted.id, { now });
+
+    expect(
+      (await listSprints(database, { now })).sprints.map((sprint) => sprint.id),
+    ).not.toContain(deleted.id);
+    expect(
+      (await listSprintMaterialPlan(database, retained.id, { now }))
+        .selectedMaterialIds,
+    ).toEqual([shared.id]);
+    expect(await hasSprintMaterialMembership(database, shared.id)).toBe(true);
+    expect(await hasSprintMaterialMembership(database, exclusive.id)).toBe(
+      false,
+    );
+    expect(await listLibraryMaterialTree(database)).toEqual(libraryBefore);
+  });
+
+  it("rejects deletion across the saved timezone's start boundary and preserves current and past membership", async () => {
+    const now = new Date("2090-01-01T12:00:00.000Z");
+    const startDate = getFutureDate();
+    const sprint = await createSprintForDates(
+      database,
+      startDate,
+      startDate,
+      now,
+    );
+    const material = await createStandaloneMaterial(
+      database,
+      `Protected ${crypto.randomUUID()}`,
+    );
+    await updateSprintMaterialSelection(
+      database,
+      sprint.id,
+      [{ type: "select", materialId: material.id }],
+      { now },
+    );
+    const timeZone = (await listSprints(database, { now })).timeZone;
+    if (!timeZone) throw new Error("Expected a saved application timezone.");
+    let boundary = new Date(`${startDate}T00:00:00.000Z`);
+    boundary = new Date(boundary.getTime() - 36 * 60 * 60 * 1000);
+    while (getLocalDate(boundary, timeZone) < startDate) {
+      boundary = new Date(boundary.getTime() + 15 * 60 * 1000);
+    }
+    const beforeBoundary = new Date(boundary.getTime() - 1);
+    expect(
+      (await listSprints(database, { now: beforeBoundary })).sprints.find(
+        (saved) => saved.id === sprint.id,
+      )?.status,
+    ).toBe("future");
+
+    for (const executionTime of [
+      boundary,
+      new Date(boundary.getTime() + 48 * 60 * 60 * 1000),
+    ]) {
+      await expect(
+        deleteSprint(database, sprint.id, { now: executionTime }),
+      ).rejects.toMatchObject({ name: "SprintNotFutureError" });
+      expect(
+        (
+          await listSprintMaterialPlan(database, sprint.id, {
+            now: executionTime,
+          })
+        ).selectedMaterialIds,
+      ).toEqual([material.id]);
+      expect(await hasSprintMaterialMembership(database, material.id)).toBe(
+        true,
+      );
+    }
   });
 
   it("persists calendar dates and pins the first saved application timezone", async () => {
