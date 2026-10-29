@@ -164,6 +164,26 @@ planned end even when no next Sprint exists.
 - Deferral never erases or redistributes practice already recorded against
   the selected Material.
 
+### Tag-Based Candidate Filtering
+
+- In the Manage Material dialog, provide a multi-select filter for each Tag
+  group. A candidate matches any selected Tag within a group and must match at
+  least one selected Tag in every group with an active filter.
+- Match direct Tag assignments only. A Tag assigned to an ancestor does not
+  match its descendants.
+- Filtering changes candidate visibility only; it does not change Library
+  hierarchy or saved Sprint membership. Filters are temporary, remain selected
+  after a recoverable error, and clear when the dialog closes.
+- When a matching nested Material has nonmatching ancestors, show those
+  ancestors as context only, without selection controls. Only direct matches
+  are selectable.
+- Selecting a matching Material includes its full current subtree, including
+  descendants that do not match the filters. Before selection, show the number
+  of such descendants inline; do not require a second confirmation. Show all
+  included Material in the Selected tree after selection.
+- Preserve the existing rules for explicit selection, archived Material,
+  subtree inclusion, past-Sprint locks, and deferral.
+
 ### Protection And Classification
 
 - Every existing membership protects its Material from permanent deletion,
@@ -189,14 +209,14 @@ each remains a manageable vertical slice. GitHub owns their acceptance criteria,
 readiness, native blocking relationships, and issue state; do not maintain
 duplicate local issue bodies.
 
-| Story                                                                                                          | Direct blockers                      |
-| -------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| [#24: Create and browse calendar Sprints](https://github.com/hady-salhab93/Practice-Planner/issues/24)         | None                                 |
-| [#25: Edit Sprint plans safely](https://github.com/hady-salhab93/Practice-Planner/issues/25)                   | #24                                  |
-| [#26: Select and refine Sprint Material](https://github.com/hady-salhab93/Practice-Planner/issues/26)          | #24                                  |
-| [#27: Defer selected Material to a future Sprint](https://github.com/hady-salhab93/Practice-Planner/issues/27) | #26                                  |
-| [#28: Delete a future Sprint safely](https://github.com/hady-salhab93/Practice-Planner/issues/28)              | #26                                  |
-| [#29: Filter Sprint selection by Tags](https://github.com/hady-salhab93/Practice-Planner/issues/29)            | #26 and real Material classification |
+| Story                                                                                                          | Direct blockers |
+| -------------------------------------------------------------------------------------------------------------- | --------------- |
+| [#24: Create and browse calendar Sprints](https://github.com/hady-salhab93/Practice-Planner/issues/24)         | None            |
+| [#25: Edit Sprint plans safely](https://github.com/hady-salhab93/Practice-Planner/issues/25)                   | #24             |
+| [#26: Select and refine Sprint Material](https://github.com/hady-salhab93/Practice-Planner/issues/26)          | #24             |
+| [#27: Defer selected Material to a future Sprint](https://github.com/hady-salhab93/Practice-Planner/issues/27) | #26             |
+| [#28: Delete a future Sprint safely](https://github.com/hady-salhab93/Practice-Planner/issues/28)              | #26             |
+| [#29: Filter Sprint selection by Tags](https://github.com/hady-salhab93/Practice-Planner/issues/29)            | #26 and #35     |
 
 All six are native sub-issues of Feature #18. No `ready-for-agent` labels were
 applied. Story #24 and Story #26 were implemented under explicit
@@ -206,11 +226,11 @@ implementation request on 2026-10-28 and is now implemented. The Story #27
 confirmation and stale-selection interaction choices are recorded under
 Refinement And Deferral.
 
-Tag filtering has `needs-info` and remains discovery-gated. Its classification
-implementation Story is not yet published; the
+Tag-filtering interaction discovery was resolved on 2026-10-29 and is recorded
+above. Classification implementation is tracked in [Story #35](https://github.com/hady-salhab93/Practice-Planner/issues/35), a child of Material Management #9. Story #29 has a native blocker on #35 and remains gated until that workflow is implemented and verified. The
 [cross-feature requirements](https://github.com/hady-salhab93/Practice-Planner/issues/15)
-are a requirements source, not an actionable completed blocker. Add the native
-classification dependency when its owning Story exists.
+are a requirements source, not an actionable completed blocker. #29 also remains
+blocked by #26 until its membership workflow is available.
 
 Stories #24 and #26 are implemented. Story #27 implementation is in place, but
 its focused browser verification remains outstanding. Stories #25 and #29

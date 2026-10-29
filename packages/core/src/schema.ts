@@ -65,6 +65,68 @@ export const materialReferences = pgTable("material_references", {
 
 export type MaterialReference = typeof materialReferences.$inferSelect;
 
+export const tagGroups = pgTable(
+  "tag_groups",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    name: text().notNull(),
+  },
+  (table) => [
+    check(
+      "tag_groups_name_not_blank",
+      sql`length(btrim(${table.name}, ${titleEdgeWhitespace})) > 0`,
+    ),
+    uniqueIndex("tag_groups_name_unique").on(
+      normalizedTitleExpression(table.name),
+    ),
+  ],
+);
+
+export type TagGroup = typeof tagGroups.$inferSelect;
+export const tags = pgTable(
+  "tags",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => tagGroups.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+  },
+  (table) => [
+    check(
+      "tags_name_not_blank",
+      sql`length(btrim(${table.name}, ${titleEdgeWhitespace})) > 0`,
+    ),
+    uniqueIndex("tags_group_name_unique").on(
+      table.groupId,
+      normalizedTitleExpression(table.name),
+    ),
+    index("tags_group_id_idx").on(table.groupId),
+  ],
+);
+
+export type Tag = typeof tags.$inferSelect;
+export const materialTags = pgTable(
+  "material_tags",
+  {
+    materialId: uuid("material_id")
+      .notNull()
+      .references(() => materials.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({
+      name: "material_tags_pk",
+      columns: [table.materialId, table.tagId],
+    }),
+    index("material_tags_tag_id_idx").on(table.tagId),
+  ],
+);
+
+export type MaterialTag = typeof materialTags.$inferSelect;
+
 export const applicationSettings = pgTable(
   "application_settings",
   {

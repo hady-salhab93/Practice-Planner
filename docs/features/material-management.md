@@ -104,10 +104,14 @@ or close the Delete story.
 ### Classification
 
 - Users create, rename, and delete their own Tag groups and Tags. Examples include a "Kind" group with "Song" and "Exercise" Tags, a "Focus" group with "Arpeggios" and "Pentatonic", and a "Style" group with "Blues" and "Rock". No built-in taxonomy is required.
+- Manage Tag groups and Tags in a Library-level Manage Tags dialog. Assign and remove existing Tags in the Material Edit details dialog, saving or cancelling those changes together with the other details. Create new groups and Tags in Manage Tags, not inline during assignment.
+- Tag group names are unique globally, and Tag names are unique within their group, ignoring case and surrounding whitespace. Create and rename operations in Manage Tags save immediately; a recoverable error preserves the current input.
+  -16. Create, rename, and delete user-defined Tag groups and Tags;
 - Classification is optional. A Material can have multiple Tags in a group, and Tags apply only to the Material they are assigned to; they are not inherited by descendants.
+- Tag assignments remain editable for archived Material. Archived Material is not available as a Sprint candidate until its root is restored.
 - Use Tag groups to filter Library Material and help select Material for a Sprint. When multiple Tags are selected within one group, a Material matches any of those Tags; when filters are selected in multiple groups, a Material must match at least one Tag from each selected group.
 - Sprint reviews compare practice time within each Tag group. A Material assigned multiple Tags within a group contributes its full recorded time to each matching Tag. These label totals overlap and are not additive; distinguish them from the actual practice-time total.
-- Renaming or deleting a group or Tag updates current classification. Removing classification does not delete Material or practice records.
+- Renaming a group or Tag updates current classification. Deleting a Tag removes its assignments; deleting a group also deletes its Tags and their assignments. Confirm deletion with the number of affected Material, without deleting Material or practice records.
 
 ### Archiving And Restoration
 
@@ -154,7 +158,7 @@ These scenarios are requirements for future verification, not claims of passing 
 13. Attempt deletion when only a descendant has practice or a Sprint reference; block the whole deletion and offer archiving, preserving all records and references.
 14. Add passages beneath previously practiced Material; its earlier practice remains on that Material and is not assigned to the new passages.
 15. Rename Material, change its Tags, or add children after a Sprint ends; the ended Sprint view reflects the current name, Tags, and hierarchy while earlier practice remains attached to the original Material. Move-related verification is deferred.
-16. Create user-defined Tag groups and Tags, leave Material unclassified or assign multiple Tags in one group, then filter Material with OR within a group and AND across selected groups.
+16. Create, rename, and delete user-defined Tag groups and Tags; assign and remove multiple direct Tags per group through Edit details, including for archived Material. Confirm taxonomy deletion with its affected-Material count and preserve Material and practice records. Filter candidates with OR within a group and AND across selected groups.
 17. Record practice against Material with more than one Tag in a group; the Sprint review shows the full time under each matching Tag, marks those totals as overlapping, and keeps the actual practice-time total distinct.
 
 ## Exclusions
@@ -170,7 +174,7 @@ These scenarios are requirements for future verification, not claims of passing 
 
 The following cross-feature agreements are approved at discovery level. Their detailed interaction contracts belong in the owning feature PRDs and still block affected integration work, not basic capture and organization:
 
-- **Sprint planning and refinement:** The approved [Sprint planning PRD](sprint-planning.md) owns calendar lifecycle, current-subtree selection, subtree deferral, explicit inclusion of later descendants, and future-Sprint cancellation. The [deletion safety agreement](material-deletion-safety.md) owns membership protection and preservation through archiving. Tag-based selection filtering depends on classification and additional filter interaction discovery. Sprint implementation and real membership verification remain outstanding; moving remains deferred.
+- **Sprint planning and refinement:** The approved [Sprint planning PRD](sprint-planning.md) owns calendar lifecycle, current-subtree selection, subtree deferral, explicit inclusion of later descendants, and future-Sprint cancellation. The [deletion safety agreement](material-deletion-safety.md) owns membership protection and preservation through archiving. Tag-based selection filtering is specified in the Sprint PRD and depends on real classification. Sprint implementation and real membership verification remain outstanding; moving remains deferred.
 - **Focused timing:** V1 allows missed practice to be entered for any past date as one Material and a focused-time duration, then edited or deleted. Timer records count only unpaused time, continue while the app is backgrounded until explicitly paused or stopped, and can be edited or deleted. An unexpectedly interrupted timer returns unconfirmed for user confirmation or duration adjustment. The [deletion safety agreement](material-deletion-safety.md) protects saved and in-progress practice and preserves activity through archiving. Eligibility, timer controls, recovery mechanics, and date/timezone boundaries remain open.
 - **Daily observations:** V1 allows one optional day-level summary per practice date across that day's practice; per-Material notes are not required. Detailed capture and editing behavior remains open.
 - **Sprint review:** compare practice time within each user-defined Tag group using current Material classification, names, and hierarchy, including for ended Sprints. Multiple-Tag totals overlap as specified above. Review layout, comparisons beyond these groups, and historical-to-current Material navigation remain open.
@@ -182,7 +186,7 @@ Do not implement unresolved interactions by borrowing behavior from the deleted 
 
 Follow [testing standards](../TESTING_STANDARDS.md) and [running checks](../agents/testing.md). Use focused behavior checks for hierarchy integrity, title conflicts, stable saved sibling sequence, pagination, root-only archive/restoration of complete subtrees, and deletion eligibility. Verify persistence and protected relationships through integration checks, and exercise Save/Cancel, unsaved changes, page/search navigation, and destructive confirmation through user-facing checks. Sort and move behavior is excluded from current-release verification.
 
-Historical current-state reporting scenarios require the later Sprint, timing, and review contracts; they cannot be declared verified by Library-only tests. Use [frontend standards](../FRONTEND_STANDARDS.md) for layout and controls without treating this document as a finalized screen design. Implementation issues and their acceptance criteria will be proposed separately after reviewing this PRD and its dependencies.
+Historical current-state reporting scenarios require the later Sprint, timing, and review contracts; they cannot be declared verified by Library-only tests. Use [frontend standards](../FRONTEND_STANDARDS.md) for layout and controls without treating this document as a finalized screen design. The classification workflow is published as Story #35 under the Material Management issue; other implementation issues require approved contracts and dependencies.
 
 ## Implementation Backlog And Delivery Contract
 
@@ -191,6 +195,7 @@ and its sub-issues own the implementation backlog. Local copies of the issue
 breakdown have been removed; consult GitHub for issue state, acceptance criteria,
 and dependencies. Sorting and moving remain deferred, and the
 [pagination spec](library-pagination.md) owns the replacement release scope.
+The classification workflow is tracked in [Story #35](https://github.com/hady-salhab93/Practice-Planner/issues/35).
 
 Each implementation slice delivers a usable workflow through the local UI,
 React Router loaders/actions, core domain operations, PostgreSQL persistence,
