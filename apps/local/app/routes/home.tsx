@@ -26,6 +26,8 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Tag,
+  Trash2,
   X,
 } from "lucide-react";
 import {
@@ -36,6 +38,7 @@ import {
   createStandaloneMaterial,
   InvalidMaterialTitleError,
   InvalidMaterialReferenceError,
+  InvalidMaterialTagError,
   listLibraryMaterialPage,
   listArchivedMaterialTree,
   MaterialNotFoundError,
@@ -46,12 +49,36 @@ import {
   updateMaterialMetadata,
   type MaterialTreeNode,
 } from "@practice-planner/core/material-operations";
+import {
+  listTagGroups,
+  listTags,
+  createTag,
+  createTagGroup,
+  deleteTag,
+  deleteTagGroup,
+  getTagDeletionImpactCount,
+  getTagGroupDeletionImpactCount,
+  renameTag,
+  renameTagGroup,
+  ClassificationDeleteImpactChangedError,
+  InvalidTagGroupNameError,
+  InvalidTagNameError,
+  TagGroupNameConflictError,
+  TagGroupNotFoundError,
+  TagNameConflictError,
+  TagNotFoundError,
+} from "@practice-planner/core/classification-operations";
+import type {
+  Tag as ClassificationTag,
+  TagGroup,
+} from "@practice-planner/core/schema";
 import { getDatabase } from "@practice-planner/core/db.server";
 import type { Route } from "./+types/home";
 
 type MaterialMetadataDraft = {
   title: string;
   description: string;
+  tagIds: string[];
   references: Array<{
     key: string;
     id?: string;
@@ -64,9 +91,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const requestedPage = parseLibraryPageParam(url.searchParams.get("page"));
   const database = getDatabase();
-  const [libraryPage, archivedMaterials] = await Promise.all([
+  const [libraryPage, archivedMaterials, tagGroups, tags] = await Promise.all([
     listLibraryMaterialPage(database, requestedPage),
     listArchivedMaterialTree(database),
+    listTagGroups(database),
+    listTags(database),
   ]);
   const currentPageParam = url.searchParams.get("page");
   if (
@@ -76,7 +105,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     url.searchParams.set("page", String(libraryPage.page));
     throw redirect(`${url.pathname}${url.search}${url.hash}`);
   }
-  return { ...libraryPage, archivedMaterials };
+  return { ...libraryPage, archivedMaterials, tagGroups, tags };
 }
 
 export function parseLibraryPageParam(value: string | null): number {
@@ -208,6 +237,7 @@ export async function action({ request }: Route.ActionArgs) {
     const referenceIds = formData.getAll("referenceId");
     const referenceLabels = formData.getAll("referenceLabel");
     const referenceUrls = formData.getAll("referenceUrl");
+    const tagIds = formData.getAll("tagId");
     const rawDescription = formData.get("description");
     if (
       typeof materialId !== "string" ||
@@ -215,7 +245,8 @@ export async function action({ request }: Route.ActionArgs) {
       referenceIds.length !== referenceUrls.length ||
       referenceIds.some((value) => typeof value !== "string") ||
       referenceLabels.some((value) => typeof value !== "string") ||
-      referenceUrls.some((value) => typeof value !== "string")
+      referenceUrls.some((value) => typeof value !== "string") ||
+      tagIds.some((value) => typeof value !== "string")
     ) {
       return {
         ok: false,
@@ -239,6 +270,7 @@ export async function action({ request }: Route.ActionArgs) {
         title: submittedTitle,
         description: typeof rawDescription === "string" ? rawDescription : "",
         references,
+        tagIds: tagIds as string[],
       });
       return { ok: true, intent, materialId };
     } catch (error) {
@@ -251,6 +283,154 @@ export async function action({ request }: Route.ActionArgs) {
     }
   }
 
+  if (intent === "tag-group-create" || intent === "tag-group-rename") {
+    const rawName = formData.get("name");
+    const name = typeof rawName === "string" ? rawName : "";
+    const groupId = formData.get("groupId");
+    if (intent === "tag-group-rename" && typeof groupId !== "string") {
+      return {
+        ok: false,
+        intent,
+        id: "",
+        message: "This Tag group is no longer available. Reload and try again.",
+      };
+    }
+
+    try {
+      const group =
+        intent === "tag-group-create"
+          ? await createTagGroup(getDatabase(), name)
+          : await renameTagGroup(getDatabase(), groupId as string, name);
+      return { ok: true, intent, id: group.id, name: group.name };
+    } catch (error) {
+      return {
+        ok: false,
+        intent,
+        id: typeof groupId === "string" ? groupId : "",
+        submittedName: name,
+        message: getClassificationActionErrorMessage(error),
+      };
+    }
+  }
+
+  if (intent === "tag-create" || intent === "tag-rename") {
+    const rawName = formData.get("name");
+    const name = typeof rawName === "string" ? rawName : "";
+    const tagId = formData.get("tagId");
+    const groupId = formData.get("groupId");
+    if (
+      (intent === "tag-create" && typeof groupId !== "string") ||
+      (intent === "tag-rename" && typeof tagId !== "string")
+    ) {
+      return {
+        ok: false,
+        intent,
+        id: "",
+        message: "This Tag is no longer available. Reload and try again.",
+      };
+    }
+
+    try {
+      const tag =
+        intent === "tag-create"
+          ? await createTag(getDatabase(), groupId as string, name)
+          : await renameTag(getDatabase(), tagId as string, name);
+      return {
+        ok: true,
+        intent,
+        id: tag.id,
+        groupId: tag.groupId,
+        name: tag.name,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        intent,
+        id: typeof tagId === "string" ? tagId : "",
+        submittedName: name,
+        message: getClassificationActionErrorMessage(error),
+      };
+    }
+  }
+
+  if (intent === "tag-delete-preview") {
+    const entity = formData.get("entity");
+    const id = formData.get("id");
+    if ((entity !== "group" && entity !== "tag") || typeof id !== "string") {
+      return {
+        ok: false,
+        intent,
+        entity: "tag",
+        id: "",
+        message: "Could not check the deletion impact. Try again.",
+      };
+    }
+
+    try {
+      const affectedMaterialCount =
+        entity === "group"
+          ? await getTagGroupDeletionImpactCount(getDatabase(), id)
+          : await getTagDeletionImpactCount(getDatabase(), id);
+      return { ok: true, intent, entity, id, affectedMaterialCount };
+    } catch (error) {
+      return {
+        ok: false,
+        intent,
+        entity,
+        id,
+        message: getClassificationActionErrorMessage(error),
+      };
+    }
+  }
+
+  if (intent === "tag-delete" || intent === "tag-group-delete") {
+    const entity = intent === "tag-group-delete" ? "group" : "tag";
+    const id = formData.get("id");
+    const rawExpectedCount = formData.get("affectedMaterialCount");
+    const expectedAffectedMaterialCount = Number(rawExpectedCount);
+    if (
+      typeof id !== "string" ||
+      typeof rawExpectedCount !== "string" ||
+      !Number.isSafeInteger(expectedAffectedMaterialCount) ||
+      expectedAffectedMaterialCount < 0
+    ) {
+      return {
+        ok: false,
+        intent,
+        entity,
+        id: typeof id === "string" ? id : "",
+        message:
+          "Could not confirm this deletion. Check the impact and try again.",
+      };
+    }
+
+    try {
+      const affectedMaterialCount =
+        entity === "group"
+          ? await deleteTagGroup(
+              getDatabase(),
+              id,
+              expectedAffectedMaterialCount,
+            )
+          : await deleteTag(getDatabase(), id, expectedAffectedMaterialCount);
+      return { ok: true, intent, entity, id, affectedMaterialCount };
+    } catch (error) {
+      return {
+        ok: false,
+        intent,
+        entity,
+        id,
+        ...(error instanceof ClassificationDeleteImpactChangedError
+          ? {
+              impactChanged: true,
+              affectedMaterialCount: error.affectedMaterialCount,
+            }
+          : {}),
+        message: getClassificationActionErrorMessage(error),
+      };
+    }
+  }
+
   return {
     ok: false,
     intent: "invalid",
@@ -258,11 +438,25 @@ export async function action({ request }: Route.ActionArgs) {
   };
 }
 
+function getClassificationActionErrorMessage(error: unknown): string {
+  if (error instanceof InvalidTagGroupNameError) return error.message;
+  if (error instanceof TagGroupNameConflictError) return error.message;
+  if (error instanceof TagGroupNotFoundError) return error.message;
+  if (error instanceof InvalidTagNameError) return error.message;
+  if (error instanceof TagNameConflictError) return error.message;
+  if (error instanceof TagNotFoundError) return error.message;
+  if (error instanceof ClassificationDeleteImpactChangedError) {
+    return `${error.message} It now affects ${error.affectedMaterialCount} Material.`;
+  }
+  return "Could not update classification. Your input is still here; try again.";
+}
+
 function getActionErrorMessage(
   error: unknown,
   fallback = "Could not save this Material. Your title is still here; try again.",
 ): string {
   if (error instanceof InvalidMaterialReferenceError) return error.message;
+  if (error instanceof InvalidMaterialTagError) return error.message;
   if (error instanceof InvalidMaterialTitleError)
     return "Enter a title for this Material.";
   if (error instanceof MaterialTitleConflictError) {
@@ -291,6 +485,8 @@ export default function Home() {
   const {
     materials,
     archivedMaterials,
+    tagGroups,
+    tags,
     page,
     pageCount,
     standaloneTotal,
@@ -304,6 +500,9 @@ export default function Home() {
   const archiveFetcher = useFetcher<typeof action>();
   const metadataFetcher = useFetcher<typeof action>();
   const [view, setView] = useState<"library" | "archive">("library");
+  const [isManagingTags, setIsManagingTags] = useState(false);
+  const manageTagsButtonRef = useRef<HTMLButtonElement>(null);
+  const wasManagingTagsOpen = useRef(false);
   const [createTitle, setCreateTitle] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [childDrafts, setChildDrafts] = useState<Record<string, string>>({});
@@ -373,6 +572,17 @@ export default function Home() {
     if (editingMetadataId !== null && !panel.open) panel.showModal();
     if (editingMetadataId === null && panel.open) panel.close();
   }, [editingMetadataId]);
+
+  useEffect(() => {
+    if (isManagingTags) {
+      wasManagingTagsOpen.current = true;
+      return;
+    }
+    if (wasManagingTagsOpen.current) {
+      manageTagsButtonRef.current?.focus();
+      wasManagingTagsOpen.current = false;
+    }
+  }, [isManagingTags]);
 
   useEffect(() => {
     if (
@@ -840,6 +1050,15 @@ export default function Home() {
                 >
                   Archived
                 </button>
+                <button
+                  ref={manageTagsButtonRef}
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => setIsManagingTags(true)}
+                >
+                  <Tag aria-hidden="true" size={16} />
+                  Manage Tags
+                </button>
               </nav>
             </div>
             <searchFetcher.Form
@@ -1185,6 +1404,57 @@ export default function Home() {
                   Add reference
                 </button>
               </fieldset>
+              <fieldset className="reference-editor tag-assignment-editor">
+                <legend>Tags</legend>
+                {tagGroups.length === 0 ? (
+                  <p>No Tag groups yet. Create one to classify Material.</p>
+                ) : (
+                  tagGroups.map((group) => {
+                    const groupTags = tags.filter(
+                      (tag) => tag.groupId === group.id,
+                    );
+                    return (
+                      <fieldset className="tag-assignment-group" key={group.id}>
+                        <legend>{group.name}</legend>
+                        {groupTags.length === 0 ? (
+                          <p>No Tags in this group yet.</p>
+                        ) : (
+                          groupTags.map((tag) => (
+                            <label
+                              className="tag-assignment-option"
+                              key={tag.id}
+                            >
+                              <input
+                                type="checkbox"
+                                name="tagId"
+                                value={tag.id}
+                                checked={draftMetadata.tagIds.includes(tag.id)}
+                                disabled={metadataFetcher.state !== "idle"}
+                                onChange={(event) => {
+                                  const checked = event.currentTarget.checked;
+                                  setDraftMetadata((draft) =>
+                                    draft
+                                      ? {
+                                          ...draft,
+                                          tagIds: checked
+                                            ? [...draft.tagIds, tag.id]
+                                            : draft.tagIds.filter(
+                                                (id) => id !== tag.id,
+                                              ),
+                                        }
+                                      : draft,
+                                  );
+                                }}
+                              />
+                              {tag.name}
+                            </label>
+                          ))
+                        )}
+                      </fieldset>
+                    );
+                  })
+                )}
+              </fieldset>
               {metadataError && (
                 <p
                   className="form-error"
@@ -1220,7 +1490,526 @@ export default function Home() {
           </metadataFetcher.Form>
         )}
       </dialog>
+      <ManageTagsDialog
+        isOpen={isManagingTags}
+        groups={tagGroups}
+        tags={tags}
+        onClose={() => setIsManagingTags(false)}
+      />
     </>
+  );
+}
+
+type PendingClassificationDeletion = {
+  entity: "group" | "tag";
+  id: string;
+  name: string;
+  affectedMaterialCount?: number;
+};
+
+function ManageTagsDialog({
+  isOpen,
+  groups,
+  tags,
+  onClose,
+}: {
+  isOpen: boolean;
+  groups: TagGroup[];
+  tags: ClassificationTag[];
+  onClose: () => void;
+}) {
+  const fetcher = useFetcher<typeof action>();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [groupName, setGroupName] = useState("");
+  const [tagNames, setTagNames] = useState<Record<string, string>>({});
+  const [editingGroup, setEditingGroup] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [editingTag, setEditingTag] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [pendingDeletion, setPendingDeletion] =
+    useState<PendingClassificationDeletion | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const isBusy = fetcher.state !== "idle";
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (isOpen && !dialog.open) dialog.showModal();
+    if (!isOpen && dialog.open) dialog.close();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (fetcher.state !== "idle" || !fetcher.data) return;
+    const result = fetcher.data;
+    if (!result.ok) {
+      setErrorMessage(
+        "message" in result && typeof result.message === "string"
+          ? result.message
+          : "Could not update classification. Your input is still here; try again.",
+      );
+      if (
+        (result.intent === "tag-delete" ||
+          result.intent === "tag-group-delete") &&
+        "impactChanged" in result &&
+        result.impactChanged
+      ) {
+        setPendingDeletion((current) =>
+          current
+            ? {
+                ...current,
+                affectedMaterialCount:
+                  "affectedMaterialCount" in result &&
+                  typeof result.affectedMaterialCount === "number"
+                    ? result.affectedMaterialCount
+                    : current.affectedMaterialCount,
+              }
+            : current,
+        );
+      }
+      return;
+    }
+
+    setErrorMessage(null);
+    if (result.intent === "tag-group-create") {
+      setGroupName("");
+      setStatusMessage("Tag group created.");
+    } else if (result.intent === "tag-group-rename") {
+      setEditingGroup(null);
+      setStatusMessage("Tag group renamed.");
+    } else if (result.intent === "tag-create") {
+      if ("groupId" in result && typeof result.groupId === "string") {
+        setTagNames((drafts) => ({ ...drafts, [result.groupId]: "" }));
+      }
+      setStatusMessage("Tag created.");
+    } else if (result.intent === "tag-rename") {
+      setEditingTag(null);
+      setStatusMessage("Tag renamed.");
+    } else if (result.intent === "tag-delete-preview") {
+      setPendingDeletion((current) =>
+        current && current.id === result.id
+          ? {
+              ...current,
+              affectedMaterialCount: result.affectedMaterialCount,
+            }
+          : current,
+      );
+    } else if (
+      result.intent === "tag-delete" ||
+      result.intent === "tag-group-delete"
+    ) {
+      setPendingDeletion(null);
+      setStatusMessage(
+        `${result.entity === "group" ? "Tag group" : "Tag"} deleted.`,
+      );
+    }
+  }, [fetcher.data, fetcher.state]);
+
+  function startDeletion(entity: "group" | "tag", id: string, name: string) {
+    setErrorMessage(null);
+    setStatusMessage(null);
+    setPendingDeletion({ entity, id, name });
+    void fetcher.submit(
+      { intent: "tag-delete-preview", entity, id },
+      { method: "post" },
+    );
+  }
+
+  function confirmDeletion() {
+    if (!pendingDeletion || pendingDeletion.affectedMaterialCount === undefined)
+      return;
+    setErrorMessage(null);
+    void fetcher.submit(
+      {
+        intent:
+          pendingDeletion.entity === "group"
+            ? "tag-group-delete"
+            : "tag-delete",
+        id: pendingDeletion.id,
+        affectedMaterialCount: String(pendingDeletion.affectedMaterialCount),
+      },
+      { method: "post" },
+    );
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="material-panel manage-tags-panel"
+      aria-labelledby="manage-tags-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!isBusy) onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !isBusy) onClose();
+      }}
+    >
+      <div className="material-panel-form">
+        <header className="material-panel-header">
+          <div>
+            <p className="page-context">Library</p>
+            <h2 id="manage-tags-title">Manage Tags</h2>
+          </div>
+          <button
+            className="button button-secondary panel-close"
+            type="button"
+            aria-label="Close Manage Tags"
+            title="Close"
+            disabled={isBusy}
+            onClick={onClose}
+          >
+            <X aria-hidden="true" size={16} />
+          </button>
+        </header>
+        <div className="material-panel-content manage-tags-content">
+          {errorMessage && (
+            <p className="form-error" role="alert">
+              {errorMessage}
+            </p>
+          )}
+          {statusMessage && (
+            <p className="sprint-timezone" role="status">
+              {statusMessage}
+            </p>
+          )}
+          <fetcher.Form
+            className="tag-management-create"
+            method="post"
+            onSubmit={() => {
+              setErrorMessage(null);
+              setStatusMessage(null);
+            }}
+          >
+            <input type="hidden" name="intent" value="tag-group-create" />
+            <label htmlFor="new-tag-group-name">New Tag group</label>
+            <div className="form-row">
+              <input
+                id="new-tag-group-name"
+                name="name"
+                required
+                value={groupName}
+                disabled={isBusy}
+                onChange={(event) => {
+                  setGroupName(event.currentTarget.value);
+                  setErrorMessage(null);
+                }}
+              />
+              <button
+                className="button button-primary"
+                type="submit"
+                disabled={!groupName.trim() || isBusy}
+              >
+                <Plus aria-hidden="true" size={16} />
+                Add group
+              </button>
+            </div>
+          </fetcher.Form>
+
+          {groups.length === 0 ? (
+            <p className="empty-state">No Tag groups yet.</p>
+          ) : (
+            <div className="tag-management-groups">
+              {groups.map((group) => {
+                const groupTags = tags.filter(
+                  (tag) => tag.groupId === group.id,
+                );
+                const groupDraft =
+                  editingGroup?.id === group.id ? editingGroup : null;
+                return (
+                  <section
+                    className="tag-management-group"
+                    key={group.id}
+                    aria-labelledby={`tag-group-${group.id}`}
+                  >
+                    <div className="tag-management-heading">
+                      <h3 id={`tag-group-${group.id}`}>{group.name}</h3>
+                      <div className="tag-management-actions">
+                        <button
+                          className="button button-secondary"
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() =>
+                            setEditingGroup({ id: group.id, name: group.name })
+                          }
+                        >
+                          <Pencil aria-hidden="true" size={16} />
+                          Rename
+                        </button>
+                        <button
+                          className="button button-secondary"
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() =>
+                            startDeletion("group", group.id, group.name)
+                          }
+                        >
+                          <Trash2 aria-hidden="true" size={16} />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                    {groupDraft && (
+                      <fetcher.Form
+                        className="tag-management-edit"
+                        method="post"
+                        onSubmit={() => {
+                          setErrorMessage(null);
+                          setStatusMessage(null);
+                        }}
+                      >
+                        <input
+                          type="hidden"
+                          name="intent"
+                          value="tag-group-rename"
+                        />
+                        <input type="hidden" name="groupId" value={group.id} />
+                        <label htmlFor={`rename-group-${group.id}`}>
+                          Tag group name
+                        </label>
+                        <div className="form-row">
+                          <input
+                            id={`rename-group-${group.id}`}
+                            name="name"
+                            required
+                            value={groupDraft.name}
+                            disabled={isBusy}
+                            onChange={(event) => {
+                              setEditingGroup({
+                                id: group.id,
+                                name: event.currentTarget.value,
+                              });
+                              setErrorMessage(null);
+                            }}
+                          />
+                          <button
+                            className="button button-primary"
+                            type="submit"
+                            disabled={!groupDraft.name.trim() || isBusy}
+                          >
+                            Save name
+                          </button>
+                          <button
+                            className="button button-secondary"
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => setEditingGroup(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </fetcher.Form>
+                    )}
+
+                    {groupTags.length > 0 && (
+                      <ul className="tag-management-list">
+                        {groupTags.map((tag) => {
+                          const tagDraft =
+                            editingTag?.id === tag.id ? editingTag : null;
+                          return (
+                            <li key={tag.id}>
+                              {tagDraft ? (
+                                <fetcher.Form
+                                  className="tag-management-edit"
+                                  method="post"
+                                  onSubmit={() => {
+                                    setErrorMessage(null);
+                                    setStatusMessage(null);
+                                  }}
+                                >
+                                  <input
+                                    type="hidden"
+                                    name="intent"
+                                    value="tag-rename"
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="tagId"
+                                    value={tag.id}
+                                  />
+                                  <label htmlFor={`rename-tag-${tag.id}`}>
+                                    Tag name
+                                  </label>
+                                  <div className="form-row">
+                                    <input
+                                      id={`rename-tag-${tag.id}`}
+                                      name="name"
+                                      required
+                                      value={tagDraft.name}
+                                      disabled={isBusy}
+                                      onChange={(event) => {
+                                        setEditingTag({
+                                          id: tag.id,
+                                          name: event.currentTarget.value,
+                                        });
+                                        setErrorMessage(null);
+                                      }}
+                                    />
+                                    <button
+                                      className="button button-primary"
+                                      type="submit"
+                                      disabled={!tagDraft.name.trim() || isBusy}
+                                    >
+                                      Save name
+                                    </button>
+                                    <button
+                                      className="button button-secondary"
+                                      type="button"
+                                      disabled={isBusy}
+                                      onClick={() => setEditingTag(null)}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </fetcher.Form>
+                              ) : (
+                                <>
+                                  <span>{tag.name}</span>
+                                  <div className="tag-management-actions">
+                                    <button
+                                      className="button button-secondary"
+                                      type="button"
+                                      disabled={isBusy}
+                                      onClick={() =>
+                                        setEditingTag({
+                                          id: tag.id,
+                                          name: tag.name,
+                                        })
+                                      }
+                                    >
+                                      <Pencil aria-hidden="true" size={16} />
+                                      Rename
+                                    </button>
+                                    <button
+                                      className="button button-secondary"
+                                      type="button"
+                                      disabled={isBusy}
+                                      onClick={() =>
+                                        startDeletion("tag", tag.id, tag.name)
+                                      }
+                                    >
+                                      <Trash2 aria-hidden="true" size={16} />
+                                      Delete
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+
+                    <fetcher.Form
+                      className="tag-management-create tag-create-row"
+                      method="post"
+                      onSubmit={() => {
+                        setErrorMessage(null);
+                        setStatusMessage(null);
+                      }}
+                    >
+                      <input type="hidden" name="intent" value="tag-create" />
+                      <input type="hidden" name="groupId" value={group.id} />
+                      <label htmlFor={`new-tag-${group.id}`}>New Tag</label>
+                      <div className="form-row">
+                        <input
+                          id={`new-tag-${group.id}`}
+                          name="name"
+                          required
+                          value={tagNames[group.id] ?? ""}
+                          disabled={isBusy}
+                          onChange={(event) => {
+                            const name = event.currentTarget.value;
+                            setTagNames((drafts) => ({
+                              ...drafts,
+                              [group.id]: name,
+                            }));
+                            setErrorMessage(null);
+                          }}
+                        />
+                        <button
+                          className="button button-secondary"
+                          type="submit"
+                          disabled={
+                            !(tagNames[group.id] ?? "").trim() || isBusy
+                          }
+                        >
+                          <Plus aria-hidden="true" size={16} />
+                          Add Tag
+                        </button>
+                      </div>
+                    </fetcher.Form>
+                  </section>
+                );
+              })}
+            </div>
+          )}
+
+          {pendingDeletion && (
+            <section
+              className="tag-delete-confirmation"
+              aria-labelledby="tag-delete-title"
+              aria-live="polite"
+            >
+              <h3 id="tag-delete-title">
+                Delete{" "}
+                {pendingDeletion.entity === "group" ? "Tag group" : "Tag"}?
+              </h3>
+              <p>
+                “{pendingDeletion.name}” will be removed from{" "}
+                {pendingDeletion.entity === "group"
+                  ? "this group and its Tags"
+                  : "the classification vocabulary"}
+                .
+                {pendingDeletion.affectedMaterialCount === undefined
+                  ? " Checking affected Material…"
+                  : ` This removes classification from ${pendingDeletion.affectedMaterialCount} ${pendingDeletion.affectedMaterialCount === 1 ? "Material" : "Materials"}. Material and practice records remain.`}
+              </p>
+              <div className="tag-management-actions">
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => setPendingDeletion(null)}
+                >
+                  Cancel
+                </button>
+                {pendingDeletion.affectedMaterialCount === undefined ? (
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() =>
+                      startDeletion(
+                        pendingDeletion.entity,
+                        pendingDeletion.id,
+                        pendingDeletion.name,
+                      )
+                    }
+                  >
+                    Check impact
+                  </button>
+                ) : (
+                  <button
+                    className="button button-danger"
+                    type="button"
+                    disabled={isBusy}
+                    onClick={confirmDeletion}
+                  >
+                    Delete{" "}
+                    {pendingDeletion.entity === "group" ? "group" : "Tag"}
+                  </button>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+      </div>
+    </dialog>
   );
 }
 
@@ -1252,6 +2041,7 @@ function createMetadataDraft(
   return {
     title: material.title,
     description: material.description ?? "",
+    tagIds: material.tags.map((tag) => tag.id),
     references: material.references.map((reference) => ({
       key: reference.id,
       id: reference.id,
@@ -1265,9 +2055,12 @@ function hasMetadataChanges(
   material: MaterialTreeNode,
   draft: MaterialMetadataDraft,
 ): boolean {
+  const currentTagIds = new Set(material.tags.map((tag) => tag.id));
   return (
     draft.title !== material.title ||
     draft.description !== (material.description ?? "") ||
+    draft.tagIds.length !== currentTagIds.size ||
+    draft.tagIds.some((tagId) => !currentTagIds.has(tagId)) ||
     draft.references.length !== material.references.length ||
     draft.references.some((reference, index) => {
       const saved = material.references[index];
