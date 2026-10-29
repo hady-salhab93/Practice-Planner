@@ -20,6 +20,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  EllipsisVertical,
   ExternalLink,
   Pencil,
   Plus,
@@ -602,10 +603,11 @@ export default function Home() {
             }}
           >
             <summary
-              className="button button-secondary"
+              className="button button-secondary panel-close"
               aria-label={`Actions for ${material.title}`}
+              title={`Actions for ${material.title}`}
             >
-              Actions
+              <EllipsisVertical aria-hidden="true" size={16} />
             </summary>
             <div className="material-actions">
               <button

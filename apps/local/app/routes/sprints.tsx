@@ -19,6 +19,7 @@ import {
 import { selectSprintMaterialTree } from "@practice-planner/core/sprint-material-selection";
 import {
   createSprint,
+  deleteSprint,
   InvalidApplicationTimeZoneError,
   InvalidSprintDateError,
   InvalidSprintNameError,
@@ -27,6 +28,7 @@ import {
   SprintEditConflictError,
   SprintEndDateInPastError,
   SprintNotFoundError,
+  SprintNotFutureError,
   SprintStartDateInPastError,
   SprintStartDateLockedError,
   listSprints,
@@ -68,6 +70,8 @@ type SprintActionData =
   | { ok: false; intent: "create"; message: string }
   | { ok: true; intent: "update"; id: string }
   | { ok: false; intent: "update"; id: string; message: string }
+  | { ok: true; intent: "delete"; id: string }
+  | { ok: false; intent: "delete"; id: string; message: string }
   | { ok: true; intent: "materials"; id: string }
   | { ok: false; intent: "materials"; id: string; message: string }
   | { ok: true; intent: "defer"; id: string; movedCount: number }
@@ -88,6 +92,31 @@ export async function action({
   request,
 }: Route.ActionArgs): Promise<SprintActionData> {
   const formData = await request.formData();
+  if (formData.get("intent") === "delete") {
+    const id = getFormValue(formData, "id");
+    if (!isUuid(id)) {
+      return {
+        ok: false,
+        intent: "delete",
+        id,
+        message: "This deletion request is invalid. Reload and try again.",
+      };
+    }
+    try {
+      await deleteSprint(getDatabase(), id);
+      return { ok: true, intent: "delete", id };
+    } catch (error) {
+      return {
+        ok: false,
+        intent: "delete",
+        id,
+        message: getSprintErrorMessage(
+          error,
+          "Could not delete this Sprint. Nothing was deleted; try again or cancel.",
+        ),
+      };
+    }
+  }
   if (formData.get("intent") === "materials") {
     const id = getFormValue(formData, "id");
     const changes = parseSprintMaterialChanges(
@@ -255,6 +284,13 @@ export default function Sprints() {
         scheduledSprints[0] ??
         null);
   const navigationSprints = scheduledSprints.slice(0, 6);
+
+  useEffect(() => {
+    if (searchParams.has("sprint") && !requestedSprint) {
+      setSearchParams({ view: "all" }, { replace: true });
+      createButtonRef.current?.focus();
+    }
+  }, [requestedSprint, searchParams, setSearchParams]);
 
   useEffect(() => {
     const panel = createPanelRef.current;
@@ -910,6 +946,10 @@ function SprintRow({
               <ListPlus aria-hidden="true" size={16} />
             </button>
           )}
+          <SprintDeletion
+            sprint={sprint}
+            disabled={!canEdit || !canManageMaterials}
+          />
         </div>
       </div>
       <dialog
@@ -1321,6 +1361,117 @@ function SprintRow({
   );
 }
 
+function SprintDeletion({
+  sprint,
+  disabled,
+}: {
+  sprint: SerializedSprint;
+  disabled: boolean;
+}) {
+  const fetcher = useFetcher<typeof action>();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const submitted = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  const isDeleting = fetcher.state !== "idle";
+
+  useEffect(() => {
+    if (fetcher.state !== "idle" || !submitted.current) return;
+    submitted.current = false;
+    const data = fetcher.data;
+    if (data?.intent !== "delete" || data.id !== sprint.id) return;
+    if (!data.ok) setError(data.message);
+  }, [fetcher.data, fetcher.state, sprint.id]);
+
+  function cancel() {
+    if (isDeleting || submitted.current) return;
+    dialogRef.current?.close();
+    buttonRef.current?.focus();
+  }
+
+  return (
+    <>
+      {sprint.status === "future" && (
+        <button
+          ref={buttonRef}
+          className="button button-danger panel-close"
+          type="button"
+          aria-label={`Delete ${sprint.name}`}
+          title="Delete Sprint"
+          disabled={disabled || isDeleting}
+          onClick={() => {
+            setError(null);
+            dialogRef.current?.showModal();
+          }}
+        >
+          <Trash2 aria-hidden="true" size={16} />
+        </button>
+      )}
+      <dialog
+        ref={dialogRef}
+        className="sprint-defer-dialog sprint-delete-dialog"
+        aria-labelledby={`delete-sprint-heading-${sprint.id}`}
+        aria-describedby={`delete-sprint-description-${sprint.id}`}
+        onCancel={(event) => {
+          event.preventDefault();
+          cancel();
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          cancel();
+        }}
+      >
+        <div className="sprint-defer-content sprint-form">
+          <h2 id={`delete-sprint-heading-${sprint.id}`}>Delete Sprint?</h2>
+          <p id={`delete-sprint-description-${sprint.id}`}>
+            Permanently delete <strong>{sprint.name}</strong> and its Material
+            memberships. Library Material, practice, and membership in other
+            Sprints will not be deleted. This cannot be undone.
+          </p>
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <fetcher.Form
+            method="post"
+            className="sprint-form-actions"
+            onSubmit={(event) => {
+              if (submitted.current) {
+                event.preventDefault();
+                return;
+              }
+              submitted.current = true;
+              setError(null);
+            }}
+          >
+            <input type="hidden" name="intent" value="delete" />
+            <input type="hidden" name="id" value={sprint.id} />
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={isDeleting}
+              autoFocus
+              onClick={cancel}
+            >
+              Cancel
+            </button>
+            <button
+              className="button button-danger"
+              type="submit"
+              disabled={isDeleting}
+            >
+              <Trash2 aria-hidden="true" size={16} />
+              {isDeleting ? "Deleting..." : "Delete Sprint"}
+            </button>
+          </fetcher.Form>
+        </div>
+      </dialog>
+    </>
+  );
+}
+
 type SprintMaterialTreeProps = {
   materials: SprintMaterialNode[];
   selectedIds: Set<string>;
@@ -1521,6 +1672,7 @@ function getSprintErrorMessage(
   if (error instanceof SprintEndDateInPastError) return error.message;
   if (error instanceof SprintEditConflictError) return error.message;
   if (error instanceof SprintNotFoundError) return error.message;
+  if (error instanceof SprintNotFutureError) return error.message;
   if (error instanceof ArchivedSprintMaterialError) return error.message;
   if (error instanceof SprintMaterialLockedError) return error.message;
   if (error instanceof SprintMaterialNotFoundError) return error.message;
