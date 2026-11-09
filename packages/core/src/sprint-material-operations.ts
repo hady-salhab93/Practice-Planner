@@ -9,10 +9,15 @@ import * as schema from "./schema.js";
 import {
   applicationSettings,
   materials,
+  materialTags,
   sprintMaterials,
   sprints,
+  tagGroups,
+  tags,
   type Material,
   type Sprint,
+  type Tag,
+  type TagGroup,
 } from "./schema.js";
 import {
   getCalendarDateInTimeZone,
@@ -48,6 +53,8 @@ export type SprintMaterialCollection = {
   materialTree: SprintMaterialNode[];
   availableMaterials: SprintMaterialNode[];
   plans: Record<string, SprintMaterialSummary>;
+  tagGroups: TagGroup[];
+  tags: Tag[];
 };
 
 export class SprintMaterialLockedError extends Error {
@@ -109,7 +116,15 @@ export async function listSprintMaterialCollection(
 ): Promise<SprintMaterialCollection> {
   return database.transaction(
     async (transaction) => {
-      const [settingsRows, sprintRows, rows, memberships] = await Promise.all([
+      const [
+        settingsRows,
+        sprintRows,
+        rows,
+        memberships,
+        tagAssignments,
+        groupRows,
+        tagRows,
+      ] = await Promise.all([
         transaction
           .select({ timeZone: applicationSettings.timeZone })
           .from(applicationSettings)
@@ -124,6 +139,12 @@ export async function listSprintMaterialCollection(
           .from(materials)
           .orderBy(asc(materials.position), asc(materials.id)),
         transaction.select().from(sprintMaterials),
+        transaction.select().from(materialTags),
+        transaction.select().from(tagGroups).orderBy(asc(tagGroups.name)),
+        transaction
+          .select()
+          .from(tags)
+          .orderBy(asc(tags.groupId), asc(tags.name)),
       ]);
       const timeZone = settingsRows[0]?.timeZone ?? null;
       if (sprintRows.length > 0 && timeZone === null) {
@@ -145,12 +166,17 @@ export async function listSprintMaterialCollection(
         ids.add(membership.materialId);
         selectedIdsBySprint.set(membership.sprintId, ids);
       }
-      const materialTree = buildMaterialTree(rows, new Set());
+      const tagIdsByMaterial = groupTagIdsByMaterial(tagAssignments);
+      const materialTree = buildMaterialTree(rows, new Set(), tagIdsByMaterial);
       const plans: Record<string, SprintMaterialSummary> = {};
       for (const sprint of sprintList) {
         const selectedIds =
           selectedIdsBySprint.get(sprint.id) ?? new Set<string>();
-        const selectedTree = buildMaterialTree(rows, selectedIds);
+        const selectedTree = buildMaterialTree(
+          rows,
+          selectedIds,
+          tagIdsByMaterial,
+        );
         plans[sprint.id] = {
           selectedMaterials: selectSprintMaterialTree(
             selectedTree,
@@ -169,6 +195,8 @@ export async function listSprintMaterialCollection(
             material.parentId === null && material.archivedAt === null,
         ),
         plans,
+        tagGroups: groupRows,
+        tags: tagRows,
       };
     },
     { isolationLevel: "repeatable read", accessMode: "read only" },
@@ -196,7 +224,7 @@ export async function listSprintMaterialPlan(
         .limit(1);
       if (!settings) throw new MissingApplicationTimeZoneError();
 
-      const [rows, memberships] = await Promise.all([
+      const [rows, memberships, tagAssignments] = await Promise.all([
         transaction
           .select()
           .from(materials)
@@ -205,11 +233,16 @@ export async function listSprintMaterialPlan(
           .select({ materialId: sprintMaterials.materialId })
           .from(sprintMaterials)
           .where(eq(sprintMaterials.sprintId, sprintId)),
+        transaction.select().from(materialTags),
       ]);
       const selectedIds = new Set(
         memberships.map(({ materialId }) => materialId),
       );
-      const tree = buildMaterialTree(rows, selectedIds);
+      const tree = buildMaterialTree(
+        rows,
+        selectedIds,
+        groupTagIdsByMaterial(tagAssignments),
+      );
       const availableMaterials = tree.filter(
         (material) =>
           material.parentId === null && material.archivedAt === null,
@@ -457,15 +490,29 @@ export async function hasSprintMaterialMembership(
   return membership !== undefined;
 }
 
+function groupTagIdsByMaterial(
+  assignments: Array<{ materialId: string; tagId: string }>,
+): Map<string, string[]> {
+  const tagIdsByMaterial = new Map<string, string[]>();
+  for (const { materialId, tagId } of assignments) {
+    const tagIds = tagIdsByMaterial.get(materialId) ?? [];
+    tagIds.push(tagId);
+    tagIdsByMaterial.set(materialId, tagIds);
+  }
+  return tagIdsByMaterial;
+}
+
 function buildMaterialTree(
   rows: Material[],
   selectedIds: Set<string>,
+  tagIdsByMaterial: Map<string, string[]>,
 ): SprintMaterialNode[] {
   const nodes = new Map<string, SprintMaterialNode>();
   for (const material of rows) {
     nodes.set(material.id, {
       ...material,
       isSelected: selectedIds.has(material.id),
+      tagIds: tagIdsByMaterial.get(material.id) ?? [],
       children: [],
     });
   }

@@ -16,8 +16,9 @@ This PRD records the discovery agreement confirmed on 2026-10-15 for
 The user approved Story publication on 2026-10-15; GitHub owns the published
 backlog linked below. Story #24 was implemented first; Story #26 was explicitly
 authorized by an implementation task on 2026-10-16 and is now implemented.
-Story #28 was authorized on 2026-10-28 and is now implemented. Other Stories
-retain the delivery and approval status recorded below.
+Story #28 was authorized on 2026-10-28 and is now implemented. Story #29 was
+authorized on 2026-11-09 after classification Story #35 merged and is now
+implemented. Other Stories retain the delivery and approval status recorded below.
 
 Use the [glossary](../../GLOSSARY.md) for Material and Library terminology.
 The [Material management PRD](material-management.md) owns Library behavior;
@@ -220,21 +221,20 @@ duplicate local issue bodies.
 
 All six are native sub-issues of Feature #18. No `ready-for-agent` labels were
 applied. Story #24 and Story #26 were implemented under explicit
-implementation authorization. Story #27 has now been authorized; Stories #25
-and #29 remain gated. Story #28 was authorized by the next-available-issue
+implementation authorization. Story #27 has now been authorized; Story #25
+remains gated. Story #28 was authorized by the next-available-issue
 implementation request on 2026-10-28 and is now implemented. The Story #27
 confirmation and stale-selection interaction choices are recorded under
 Refinement And Deferral.
 
 Tag-filtering interaction discovery was resolved on 2026-10-29 and is recorded
-above. Classification implementation is tracked in [Story #35](https://github.com/hady-salhab93/Practice-Planner/issues/35), a child of Material Management #9. Story #29 has a native blocker on #35 and remains gated until that workflow is implemented and verified. The
+above. Classification was delivered by [Story #35](https://github.com/hady-salhab93/Practice-Planner/issues/35), a child of Material Management #9, and Story #29 is now implemented on top of it. The
 [cross-feature requirements](https://github.com/hady-salhab93/Practice-Planner/issues/15)
-are a requirements source, not an actionable completed blocker. #29 also remains
-blocked by #26 until its membership workflow is available.
+are a requirements source, not an actionable completed blocker.
 
 Stories #24 and #26 are implemented. Story #27 implementation is in place, but
-its focused browser verification remains outstanding. Stories #25 and #29
-remain gated; Story #28 is implemented and verified. No prefactoring Story is
+its focused browser verification remains outstanding. Story #25 remains gated;
+Stories #28 and #29 are implemented and verified. No prefactoring Story is
 justified by the current evidence.
 
 ## Verification Agreement
@@ -287,6 +287,15 @@ The temporary browser Sprint and its membership were removed. Practice
 persistence does not exist yet, so practice-integrity verification remains
 unclaimed; this change adds no practice schema or deletion operation.
 
+Story #29 adds a PostgreSQL-backed check that filters candidates using real
+persisted Tag groups, Tags, and assignments: OR within a group, AND across
+groups, direct assignments only, context-only ancestors, non-matching
+descendant counts, and full-subtree selection without hierarchy changes.
+Browser verification covered filtering, context labels, inline counts,
+draft selection that adds non-matching descendants to the Selected tree,
+retained filters during the draft, Cancel without saved changes, and cleared
+filters on reopening, at desktop and narrow widths.
+
 ## Cross-Feature Gates And Remaining Questions
 
 - Delete Material remains blocked until real Sprint memberships, saved practice,
@@ -307,8 +316,9 @@ unclaimed; this change adds no practice schema or deletion operation.
   choices were confirmed during implementation on 2026-10-16.
 - Exact schema, concurrency/constraint mechanisms, routes, and component
   primitives are implementation decisions, not new product vocabulary.
-- Story #29 requires additional filter interaction discovery, including controls,
-  matching-descendant context, and communicating subtree inclusion from filtered
-  candidates.
+- Story #29 filters are a collapsible "Filter by Tags" section above the
+  Library tree, with one checkbox group per Tag group and a Clear filters
+  action. Context ancestors are labelled as context only, and a matching
+  candidate states how many non-matching descendants selection also includes.
 - No infrastructure changes, automatic work completion, practice redistribution,
   or application-generated improvement assessment are approved here.

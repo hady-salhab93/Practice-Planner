@@ -284,6 +284,49 @@ body {
   font-size: 0.75rem;
 }
 
+.sprint-material-context {
+  color: var(--muted-foreground);
+}
+
+.sprint-material-note {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.sprint-tag-filters {
+  flex: none;
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.sprint-tag-filters summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.sprint-tag-filters summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.sprint-tag-filter-groups {
+  max-height: 12rem;
+  display: grid;
+  gap: 0.65rem;
+  overflow-y: auto;
+}
+
+.sprint-tag-filters > .button {
+  justify-self: start;
+}
+
 .sprint-material-toggle[aria-expanded="true"] svg {
   transform: rotate(90deg);
 }
@@ -1389,6 +1432,14 @@ button:focus-visible,
 
   .sprint-panel-wide .sprint-material-columns {
     grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  .sprint-panel-wide .sprint-material-columns:has(.sprint-tag-filters[open]) {
+    grid-template-rows: minmax(0, 2fr) minmax(0, 3fr);
+  }
+
+  .sprint-tag-filter-groups {
+    max-height: 7.5rem;
   }
 
   .sprint-panel-wide .sprint-material-columns > section + section {

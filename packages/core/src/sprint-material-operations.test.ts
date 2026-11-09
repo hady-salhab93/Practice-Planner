@@ -10,8 +10,14 @@ import {
   createStandaloneMaterial,
   archiveMaterial,
   listLibraryMaterialTree,
+  updateMaterialMetadata,
 } from "./material-operations.js";
+import { createTag, createTagGroup } from "./classification-operations.js";
 import { createSprint, listSprints } from "./sprint-operations.js";
+import {
+  filterSprintMaterialCandidates,
+  type SprintMaterialCandidate,
+} from "./sprint-material-selection.js";
 import {
   ArchivedSprintMaterialError,
   deferSprintMaterialSubtree,
@@ -646,7 +652,181 @@ describe("Sprint Material operations", () => {
       ).selectedMaterialIds,
     ).toEqual([root.id]);
   });
+
+  it("filters Sprint candidates by direct Tags without changing explicit subtree selection", async () => {
+    const now = new Date("2200-01-01T12:00:00.000Z");
+    const { startDate, endDate } = await getSprintDates(database);
+    const focus = await createTagGroup(
+      database,
+      `Focus ${crypto.randomUUID()}`,
+    );
+    const style = await createTagGroup(
+      database,
+      `Style ${crypto.randomUUID()}`,
+    );
+    const arpeggios = await createTag(database, focus.id, "Arpeggios");
+    const pentatonic = await createTag(database, focus.id, "Pentatonic");
+    const blues = await createTag(database, style.id, "Blues");
+    const rock = await createTag(database, style.id, "Rock");
+    const contextRoot = await createStandaloneMaterial(
+      database,
+      `Context root ${crypto.randomUUID()}`,
+    );
+    const nestedMatch = await createChildMaterial(
+      database,
+      contextRoot.id,
+      `Nested match ${crypto.randomUUID()}`,
+    );
+    const untaggedDescendant = await createChildMaterial(
+      database,
+      nestedMatch.id,
+      `Untagged descendant ${crypto.randomUUID()}`,
+    );
+    const oneGroupOnly = await createStandaloneMaterial(
+      database,
+      `One group only ${crypto.randomUUID()}`,
+    );
+    const rootMatch = await createStandaloneMaterial(
+      database,
+      `Root match ${crypto.randomUUID()}`,
+    );
+    const uninheritedChild = await createChildMaterial(
+      database,
+      rootMatch.id,
+      `Uninherited child ${crypto.randomUUID()}`,
+    );
+    const assign = (materialId: string, tagIds: string[]) =>
+      updateMaterialMetadata(database, materialId, {
+        description: "",
+        references: [],
+        tagIds,
+      });
+    await assign(nestedMatch.id, [arpeggios.id, blues.id]);
+    await assign(oneGroupOnly.id, [pentatonic.id]);
+    await assign(rootMatch.id, [pentatonic.id, rock.id]);
+    const sprint = await createSprint(
+      database,
+      {
+        name: `Tag filtering ${crypto.randomUUID()}`,
+        startDate,
+        endDate,
+        deviceTimeZone: "UTC",
+      },
+      { now },
+    );
+
+    const collection = await listSprintMaterialCollection(database, { now });
+    expect(collection.tagGroups).toEqual(
+      expect.arrayContaining([focus, style]),
+    );
+    expect(collection.tags).toEqual(
+      expect.arrayContaining([arpeggios, pentatonic, blues, rock]),
+    );
+    const candidates = filterSprintMaterialCandidates(
+      collection.availableMaterials,
+      [
+        [arpeggios.id, pentatonic.id],
+        [blues.id, rock.id],
+      ],
+    );
+
+    expect(candidates.map(toCandidateShape)).toEqual([
+      {
+        id: contextRoot.id,
+        isMatch: false,
+        unmatchedDescendantCount: 0,
+        children: [
+          {
+            id: nestedMatch.id,
+            isMatch: true,
+            unmatchedDescendantCount: 1,
+            children: [],
+          },
+        ],
+      },
+      {
+        id: rootMatch.id,
+        isMatch: true,
+        unmatchedDescendantCount: 1,
+        children: [],
+      },
+    ]);
+    expect(JSON.stringify(candidates)).not.toContain(oneGroupOnly.id);
+    expect(JSON.stringify(candidates)).not.toContain(uninheritedChild.id);
+
+    await updateSprintMaterialSelection(
+      database,
+      sprint.id,
+      [{ type: "select", materialId: nestedMatch.id }],
+      { now },
+    );
+    const plan = await listSprintMaterialPlan(database, sprint.id, { now });
+    expect(plan.selectedMaterialIds).toEqual(
+      expect.arrayContaining([nestedMatch.id, untaggedDescendant.id]),
+    );
+    expect(plan.selectedMaterialIds).toHaveLength(2);
+    expect(
+      (await listLibraryMaterialTree(database)).find(
+        (material) => material.id === contextRoot.id,
+      ),
+    ).toMatchObject({
+      children: [
+        {
+          id: nestedMatch.id,
+          children: [{ id: untaggedDescendant.id }],
+        },
+      ],
+    });
+  });
+
+  it("keeps every available candidate visible when no Tag filter is active", async () => {
+    const root = await createStandaloneMaterial(
+      database,
+      `Unfiltered root ${crypto.randomUUID()}`,
+    );
+    const child = await createChildMaterial(
+      database,
+      root.id,
+      `Unfiltered child ${crypto.randomUUID()}`,
+    );
+    const { availableMaterials } = await listSprintMaterialCollection(database);
+
+    const candidate = filterSprintMaterialCandidates(
+      availableMaterials,
+      [],
+    ).find((material) => material.id === root.id);
+
+    expect(candidate && toCandidateShape(candidate)).toEqual({
+      id: root.id,
+      isMatch: true,
+      unmatchedDescendantCount: 0,
+      children: [
+        {
+          id: child.id,
+          isMatch: true,
+          unmatchedDescendantCount: 0,
+          children: [],
+        },
+      ],
+    });
+  });
 });
+
+type CandidateShape = {
+  id: string;
+  isMatch: boolean;
+  unmatchedDescendantCount: number;
+  children: CandidateShape[];
+};
+
+function toCandidateShape(candidate: SprintMaterialCandidate): CandidateShape {
+  return {
+    id: candidate.id,
+    isMatch: candidate.isMatch,
+    unmatchedDescendantCount: candidate.unmatchedDescendantCount,
+    children: candidate.children.map(toCandidateShape),
+  };
+}
 
 async function getSprintDates(database: NodePgDatabase<typeof schema>) {
   let startDate = "2300-01-01";

@@ -13,7 +13,7 @@
   Feature #18, with six published Story sub-issues and explicit blockers.
   Stories #24 and #26 are implemented. Story #27 implementation is in place,
   with focused browser verification outstanding; Stories #25 and #28 remain
-  gated. Tag-filtering discovery is resolved; implementation is blocked by
+  gated. Tag-based candidate filtering (Story #29) is implemented on top of
   Material classification Story #35.
 - [Library pagination](features/library-pagination.md): replacement release spec;
   sorting and moving are deferred. Server-side paging and page navigation are

@@ -16,7 +16,11 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { selectSprintMaterialTree } from "@practice-planner/core/sprint-material-selection";
+import {
+  filterSprintMaterialCandidates,
+  selectSprintMaterialTree,
+  type SprintMaterialCandidate,
+} from "@practice-planner/core/sprint-material-selection";
 import {
   createSprint,
   deleteSprint,
@@ -46,6 +50,7 @@ import {
   SprintMaterialSelectionConflictError,
   updateSprintMaterialSelection,
   type SprintMaterialChange,
+  type SprintMaterialCollection,
   type SprintMaterialNode,
   type SprintMaterialSummary,
 } from "@practice-planner/core/sprint-material-operations";
@@ -239,8 +244,15 @@ export async function action({
 }
 
 export default function Sprints() {
-  const { timeZone, sprints, materialTree, availableMaterials, plans } =
-    useLoaderData<typeof loader>();
+  const {
+    timeZone,
+    sprints,
+    materialTree,
+    availableMaterials,
+    plans,
+    tagGroups,
+    tags,
+  } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const [deviceTimeZone, setDeviceTimeZone] = useState("");
   const [today, setToday] = useState("");
@@ -567,6 +579,8 @@ export default function Sprints() {
                 today={today}
                 materialTree={materialTree}
                 availableMaterials={availableMaterials}
+                tagGroups={tagGroups}
+                tags={tags}
                 sprints={sprints}
                 materialSummary={
                   plans[selectedSprint.id] ?? EMPTY_MATERIAL_SUMMARY
@@ -652,6 +666,8 @@ type SprintRowProps = {
   today: string;
   materialTree: SprintMaterialNode[];
   availableMaterials: SprintMaterialNode[];
+  tagGroups: SprintMaterialCollection["tagGroups"];
+  tags: SprintMaterialCollection["tags"];
   materialSummary: SprintMaterialSummary;
   isEditing: boolean;
   isManagingMaterials: boolean;
@@ -678,6 +694,8 @@ function SprintRow({
   today,
   materialTree,
   availableMaterials,
+  tagGroups,
+  tags,
   materialSummary,
   isEditing,
   isManagingMaterials,
@@ -700,6 +718,7 @@ function SprintRow({
     SprintMaterialChange[]
   >([]);
   const [materialError, setMaterialError] = useState<string | null>(null);
+  const [tagFilter, setTagFilter] = useState<Record<string, string[]>>({});
   const [deferredMaterial, setDeferredMaterial] =
     useState<DeferredMaterial | null>(null);
   const [destinationSprintId, setDestinationSprintId] = useState("");
@@ -728,6 +747,24 @@ function SprintRow({
     new Set(materialSummary.selectedMaterialIds),
   );
   const savedMaterialIds = new Set(materialSummary.selectedMaterialIds);
+  const filterGroups = tagGroups
+    .map((group) => ({
+      ...group,
+      tags: tags.filter((tag) => tag.groupId === group.id),
+    }))
+    .filter((group) => group.tags.length > 0);
+  const activeTagFilter = filterGroups
+    .map((group) =>
+      (tagFilter[group.id] ?? []).filter((tagId) =>
+        group.tags.some((tag) => tag.id === tagId),
+      ),
+    )
+    .filter((tagIds) => tagIds.length > 0);
+  const activeTagCount = activeTagFilter.flat().length;
+  const candidateMaterials = filterSprintMaterialCandidates(
+    availableMaterials,
+    activeTagFilter,
+  );
   const datesLocked = sprint.status === "past";
   const startLocked = sprint.status !== "future";
   const minStart = today;
@@ -822,6 +859,7 @@ function SprintRow({
     setMaterialDraftIds(new Set(materialSummary.selectedMaterialIds));
     setMaterialChanges([]);
     setMaterialError(null);
+    setTagFilter({});
     setDeferSuccess(null);
     onManageMaterials();
   }
@@ -897,6 +935,18 @@ function SprintRow({
     ]);
     setMaterialError(null);
     setDeferSuccess(null);
+  }
+
+  function toggleTagFilter(groupId: string, tagId: string, checked: boolean) {
+    setTagFilter((current) => {
+      const tagIds = current[groupId] ?? [];
+      return {
+        ...current,
+        [groupId]: checked
+          ? [...tagIds, tagId]
+          : tagIds.filter((id) => id !== tagId),
+      };
+    });
   }
 
   function update(field: keyof SprintDraft, value: string) {
@@ -1086,6 +1136,54 @@ function SprintRow({
             <div className="sprint-material-columns">
               <section aria-labelledby={`available-materials-${sprint.id}`}>
                 <h4 id={`available-materials-${sprint.id}`}>Library</h4>
+                {filterGroups.length > 0 && (
+                  <details className="sprint-tag-filters">
+                    <summary>
+                      Filter by Tags
+                      {activeTagCount > 0 && ` (${activeTagCount} selected)`}
+                    </summary>
+                    <div className="sprint-tag-filter-groups">
+                      {filterGroups.map((group) => (
+                        <fieldset
+                          className="tag-assignment-group"
+                          key={group.id}
+                        >
+                          <legend>{group.name}</legend>
+                          {group.tags.map((tag) => (
+                            <label
+                              className="tag-assignment-option"
+                              key={tag.id}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={(tagFilter[group.id] ?? []).includes(
+                                  tag.id,
+                                )}
+                                onChange={(event) =>
+                                  toggleTagFilter(
+                                    group.id,
+                                    tag.id,
+                                    event.currentTarget.checked,
+                                  )
+                                }
+                              />
+                              {tag.name}
+                            </label>
+                          ))}
+                        </fieldset>
+                      ))}
+                    </div>
+                    {activeTagCount > 0 && (
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        onClick={() => setTagFilter({})}
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </details>
+                )}
                 <div
                   className="sprint-material-tree-scroll"
                   tabIndex={0}
@@ -1095,9 +1193,13 @@ function SprintRow({
                     <p className="sprint-empty-state">
                       No Library Material yet.
                     </p>
+                  ) : candidateMaterials.length === 0 ? (
+                    <p className="sprint-empty-state">
+                      No Library Material matches the selected Tags.
+                    </p>
                   ) : (
                     <SprintMaterialTree
-                      materials={availableMaterials}
+                      materials={candidateMaterials}
                       selectedIds={materialDraftIds}
                       mode="available"
                       disabled={isSavingMaterials}
@@ -1472,8 +1574,13 @@ function SprintDeletion({
   );
 }
 
+type SprintMaterialTreeItem = SprintMaterialNode &
+  Partial<
+    Pick<SprintMaterialCandidate, "isMatch" | "unmatchedDescendantCount">
+  > & { children: SprintMaterialTreeItem[] };
+
 type SprintMaterialTreeProps = {
-  materials: SprintMaterialNode[];
+  materials: SprintMaterialTreeItem[];
   selectedIds: Set<string>;
   mode: "available" | "selected" | "summary";
   disabled?: boolean;
@@ -1503,6 +1610,12 @@ function SprintMaterialTree({
         const hasChildren = material.children.length > 0;
         const isExpanded = mode === "available" || expandedIds.has(material.id);
         const childrenId = `${treeId}-${material.id}`;
+        const isContext = mode === "available" && material.isMatch === false;
+        const unmatchedCount =
+          mode === "available" && !isSelected && !isContext
+            ? (material.unmatchedDescendantCount ?? 0)
+            : 0;
+        const noteId = `${childrenId}-note`;
         return (
           <li key={material.id}>
             <div className="sprint-material-item">
@@ -1526,7 +1639,22 @@ function SprintMaterialTree({
                   <ChevronRight aria-hidden="true" size={16} />
                 </button>
               )}
-              <span className="sprint-material-title">{material.title}</span>
+              <span
+                className={`sprint-material-title${isContext ? " sprint-material-context" : ""}`}
+              >
+                {material.title}
+                {isContext && (
+                  <span className="sprint-material-note">
+                    Context only; does not match the selected Tags
+                  </span>
+                )}
+                {unmatchedCount > 0 && (
+                  <span className="sprint-material-note" id={noteId}>
+                    Also includes {unmatchedCount} non-matching{" "}
+                    {unmatchedCount === 1 ? "descendant" : "descendants"}
+                  </span>
+                )}
+              </span>
               {mode === "available" ? (
                 isSelected ? (
                   <span
@@ -1537,12 +1665,13 @@ function SprintMaterialTree({
                   >
                     <Check aria-hidden="true" size={16} />
                   </span>
-                ) : (
+                ) : isContext ? null : (
                   <button
                     className="material-disclosure sprint-material-action"
                     type="button"
                     disabled={disabled}
                     aria-label={`Select ${material.title}`}
+                    aria-describedby={unmatchedCount > 0 ? noteId : undefined}
                     title={`Select ${material.title}`}
                     onClick={() => onSelect?.(material.id)}
                   >
