@@ -13,10 +13,13 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema.js";
 import {
   materials,
+  materialTags,
   materialReferences,
   normalizedTitleExpression,
+  tags,
   type Material,
   type MaterialReference,
+  type Tag,
 } from "./schema.js";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -24,6 +27,7 @@ type Database = NodePgDatabase<typeof schema>;
 export type MaterialTreeNode = Material & {
   children: MaterialTreeNode[];
   references: MaterialReference[];
+  tags: Tag[];
 };
 
 export const LIBRARY_PAGE_SIZE = 20;
@@ -52,12 +56,20 @@ export type MaterialMetadata = {
   title?: string;
   description: string;
   references: MaterialReferenceInput[];
+  tagIds?: string[];
 };
 
 export class InvalidMaterialReferenceError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "InvalidMaterialReferenceError";
+  }
+}
+
+export class InvalidMaterialTagError extends Error {
+  constructor() {
+    super("One or more selected Tags no longer exist. Reload and try again.");
+    this.name = "InvalidMaterialTagError";
   }
 }
 
@@ -261,8 +273,25 @@ async function loadMaterialTreeFromRoots(
       ),
     )
     .orderBy(asc(materialReferences.position), asc(materialReferences.id));
+  const tagRows = await database
+    .select({
+      materialId: materialTags.materialId,
+      id: tags.id,
+      groupId: tags.groupId,
+      name: tags.name,
+    })
+    .from(materialTags)
+    .innerJoin(tags, eq(materialTags.tagId, tags.id))
+    .where(
+      inArray(
+        materialTags.materialId,
+        rows.map((row) => row.id),
+      ),
+    )
+    .orderBy(asc(tags.groupId), asc(tags.name));
   const nodes = new Map<string, MaterialTreeNode>();
   const referencesByMaterial = new Map<string, MaterialReference[]>();
+  const tagsByMaterial = new Map<string, Tag[]>();
 
   for (const reference of references) {
     const existing = referencesByMaterial.get(reference.materialId) ?? [];
@@ -270,11 +299,19 @@ async function loadMaterialTreeFromRoots(
     referencesByMaterial.set(reference.materialId, existing);
   }
 
+  for (const tag of tagRows) {
+    const { materialId, ...value } = tag;
+    const existing = tagsByMaterial.get(materialId) ?? [];
+    existing.push(value);
+    tagsByMaterial.set(materialId, existing);
+  }
+
   for (const material of rows) {
     nodes.set(material.id, {
       ...material,
       children: [],
       references: referencesByMaterial.get(material.id) ?? [],
+      tags: tagsByMaterial.get(material.id) ?? [],
     });
   }
 
@@ -441,7 +478,7 @@ export async function updateMaterialMetadata(
   database: Database,
   materialId: string,
   metadata: MaterialMetadata,
-): Promise<Material & { references: MaterialReference[] }> {
+): Promise<Material & { references: MaterialReference[]; tags: Tag[] }> {
   const normalizedTitle =
     metadata.title === undefined ? undefined : normalizeTitle(metadata.title);
   const normalizedReferences = metadata.references.map((reference) => ({
@@ -456,6 +493,12 @@ export async function updateMaterialMetadata(
     throw new InvalidMaterialReferenceError(
       "A reference cannot be included more than once.",
     );
+  }
+  if (
+    metadata.tagIds !== undefined &&
+    new Set(metadata.tagIds).size !== metadata.tagIds.length
+  ) {
+    throw new InvalidMaterialTagError();
   }
 
   return database
@@ -475,6 +518,19 @@ export async function updateMaterialMetadata(
         throw new InvalidMaterialReferenceError(
           "One of these references no longer belongs to this Material. Reload and try again.",
         );
+      }
+
+      if (metadata.tagIds !== undefined) {
+        const existingTags =
+          metadata.tagIds.length === 0
+            ? []
+            : await transaction
+                .select({ id: tags.id })
+                .from(tags)
+                .where(inArray(tags.id, metadata.tagIds));
+        if (existingTags.length !== metadata.tagIds.length) {
+          throw new InvalidMaterialTagError();
+        }
       }
 
       const [updatedMaterial] = await transaction
@@ -526,12 +582,55 @@ export async function updateMaterialMetadata(
         }
       }
 
+      if (metadata.tagIds !== undefined) {
+        const existingTagIds = await transaction
+          .select({ tagId: materialTags.tagId })
+          .from(materialTags)
+          .where(eq(materialTags.materialId, materialId));
+        const existingTagIdSet = new Set(
+          existingTagIds.map(({ tagId }) => tagId),
+        );
+        const selectedTagIdSet = new Set(metadata.tagIds);
+        const removedTagIds = existingTagIds
+          .map(({ tagId }) => tagId)
+          .filter((tagId) => !selectedTagIdSet.has(tagId));
+        if (removedTagIds.length > 0) {
+          await transaction
+            .delete(materialTags)
+            .where(
+              and(
+                eq(materialTags.materialId, materialId),
+                inArray(materialTags.tagId, removedTagIds),
+              ),
+            );
+        }
+
+        const addedTagIds = metadata.tagIds.filter(
+          (tagId) => !existingTagIdSet.has(tagId),
+        );
+        if (addedTagIds.length > 0) {
+          await transaction
+            .insert(materialTags)
+            .values(addedTagIds.map((tagId) => ({ materialId, tagId })));
+        }
+      }
+
       const savedReferences = await transaction
         .select()
         .from(materialReferences)
         .where(eq(materialReferences.materialId, materialId))
         .orderBy(asc(materialReferences.position), asc(materialReferences.id));
-      return { ...updatedMaterial, references: savedReferences };
+      const savedTags = await transaction
+        .select({ id: tags.id, groupId: tags.groupId, name: tags.name })
+        .from(materialTags)
+        .innerJoin(tags, eq(materialTags.tagId, tags.id))
+        .where(eq(materialTags.materialId, materialId))
+        .orderBy(asc(tags.groupId), asc(tags.name));
+      return {
+        ...updatedMaterial,
+        references: savedReferences,
+        tags: savedTags,
+      };
     })
     .catch(async (error: unknown) => {
       if (normalizedTitle === undefined || !isTitleUniqueViolation(error))

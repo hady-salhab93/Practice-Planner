@@ -1072,6 +1072,131 @@ button:focus-visible,
   font-weight: 500;
 }
 
+.tag-assignment-editor > p,
+.tag-assignment-group > p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.tag-assignment-group {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.tag-assignment-group legend {
+  padding-inline: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.tag-assignment-option {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.tag-assignment-option input {
+  flex: none;
+}
+
+.manage-tags-panel {
+  overflow: hidden;
+}
+
+.manage-tags-content {
+  gap: 1.25rem;
+}
+
+.tag-management-create,
+.tag-management-edit {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.tag-management-groups {
+  display: grid;
+  gap: 1rem;
+}
+
+.tag-management-group {
+  min-width: 0;
+  display: grid;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tag-management-heading,
+.tag-management-list > li {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.tag-management-heading h3 {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.tag-management-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tag-management-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-management-list > li {
+  padding-inline-start: 0.75rem;
+  border-inline-start: 2px solid var(--border);
+}
+
+.tag-delete-confirmation {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--destructive);
+  border-radius: 8px;
+}
+
+.tag-delete-confirmation h3,
+.tag-delete-confirmation p {
+  margin: 0;
+}
+
+.tag-delete-confirmation h3 {
+  font-size: 1rem;
+}
+
+.tag-delete-confirmation p {
+  overflow-wrap: anywhere;
+}
+
+.tag-delete-confirmation .tag-management-actions {
+  justify-content: flex-end;
+}
+
 .reference-editor-row {
   min-width: 0;
   display: grid;
